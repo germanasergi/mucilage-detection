@@ -17,15 +17,15 @@ label: anomaly
 # Query Configuration
 query:
   bbox:
-    - 3.2833
-    - 45.3833
-    - 11.2
-    - 50.1833
+    - 12.35
+    - 44.4
+    - 13.45
+    - 45.13
 
-  start_date: '2025-02-01'
-  end_date: '2025-02-15'
+  start_date: '2024-07-15'
+  end_date: '2024-07-30'
   max_items: 1000
-  max_cloud_cover: 100
+  max_cloud_cover: 30
 
 # Download Configuration
 download:

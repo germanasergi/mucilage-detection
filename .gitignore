@@ -1,2 +1,8 @@
 # Environments
 .env
+
+# Ignore downloaded data
+**/data/
+
+# Ignore log files
+*.log
