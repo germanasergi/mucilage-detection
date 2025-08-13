@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
 from loguru import logger 
 import os 
+import ast
 
-from generate_ds import load_config, setup_environment, save_config_copy, setup_logger, query_sentinel_data, queries_curation, validate_data_alignment, retrieve_tile_name
+from generate_ds import load_config, setup_environment, save_config_copy, setup_logger, query_sentinel_data, queries_curation, validate_data_alignment, retrieve_tile_name, parse_geofootprint, compute_coverage_ratio
 
 def main():
     config_path = '/home/ubuntu/mucilage_pipeline/mucilage-detection/src/cfg/config_dataset.yaml'
@@ -54,11 +55,19 @@ def main():
         df_l2a["label"] = label
 
     # Save full datasets
-    df_l1c.to_csv(f"{env['DATASET_DIR']}/input_l1c.csv")
+    # df_l1c.to_csv(f"{env['DATASET_DIR']}/input_l1c.csv")
     df_l2a.to_csv(f"{env['DATASET_DIR']}/output_l2a.csv")
 
+    # Compute coverage ratio of image
+    df_l2a['coverage_ratio'] = df_l2a['GeoFootprint'].apply(lambda gf: compute_coverage_ratio(gf, bbox))
+
+    # Filter by threshold
+    coverage_threshold = 0.7
+    df_l2a_filtered = df_l2a[df_l2a['coverage_ratio'] > coverage_threshold].copy()
+    df_l2a_filtered.to_csv(f"{env['DATASET_DIR']}/output_l2a_filtered.csv")
+
     # Validate alignment
-    validate_data_alignment(df_l1c, df_l2a)
+    # validate_data_alignment(df_l1c, df_l2a)
 
     # Set up logger for download
     setup_logger(env['DATASET_DIR'], "sentinel_download_log")

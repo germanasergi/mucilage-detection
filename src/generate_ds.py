@@ -7,6 +7,7 @@ import pandas as pd
 import requests
 from loguru import logger
 from dotenv import load_dotenv
+from shapely.geometry import shape, Polygon
 
 # Load environment variables
 load_dotenv()
@@ -236,3 +237,39 @@ def retrieve_tile_name(df_l1c, df_l2a):
     df_l1c['single_tile_name'] = df_l1c['tile_name'].apply(lambda x: x[1:])
     df_l2a['single_tile_name'] = df_l2a['tile_name'].apply(lambda x: x[1:])
     return df_l1c, df_l2a
+
+
+def parse_geofootprint(geofootprint):
+    if isinstance(geofootprint, dict):
+        # Already a dict, return as is
+        return geofootprint
+    elif isinstance(geofootprint, str):
+        # Replace single quotes with double quotes for JSON parsing
+        geofootprint_fixed = geofootprint.replace("'", '"')
+        # Convert string to dict
+        return ast.literal_eval(geofootprint_fixed)
+    else:
+        raise ValueError(f"Unsupported GeoFootprint type: {type(geofootprint)}")
+
+
+def compute_coverage_ratio(geofootprint_str, bbox):
+    try:
+        geofootprint_dict = parse_geofootprint(geofootprint_str)
+        tile_poly = shape(geofootprint_dict)
+    except Exception as e:
+        print(f"Error parsing GeoFootprint: {e}")
+        return 0.0
+
+    # Define AOI polygon from bbox
+    aoi_polygon = Polygon([
+        (bbox[0], bbox[1]),
+        (bbox[0], bbox[3]),
+        (bbox[2], bbox[3]),
+        (bbox[2], bbox[1]),
+        (bbox[0], bbox[1])
+    ])
+    
+    intersection = tile_poly.intersection(aoi_polygon)
+    if intersection.is_empty:
+        return 0.0
+    return intersection.area / aoi_polygon.area
