@@ -4,7 +4,7 @@ endpoint_stac: 'https://stac.dataspace.copernicus.eu/v1/'
 bucket_name: 'eodata'
 
 # Dataset Configuration
-dataset_version: 'data/adr_test_filtered'
+dataset_version: 'data/adr_test'
 base_dir: '/home/ubuntu/mucilage_pipeline/mucilage-detection'
 bands:
   - 'B02'
@@ -16,16 +16,11 @@ label: anomaly
 
 # Query Configuration
 query:
-  # bbox:
-  #   - 12.35
-  #   - 44.4
-  #   - 13.45
-  #   - 45.13
   bbox:
-    - 22
-    - 54
-    - 123
-    - 55
+    - 12.35
+    - 44.4
+    - 13.45
+    - 45.13
 
   start_date: '2024-07-15'
   end_date: '2024-07-30'

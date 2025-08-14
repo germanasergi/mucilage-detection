@@ -92,9 +92,6 @@ def download_sentinel_data(df_output, base_dir, access_key, secret_key, endpoint
 
     logger.info(f"Created local directories: {input_dir}, {output_dir}")
 
-    # from dask.distributed import Client
-    # client = Client(n_workers=1, threads_per_worker=4, memory_limit="16GB", processes=False, local_directory='/tmp') # added precesses=False
-
     S3_CONFIG = {
         "key": access_key,
         "secret": secret_key,
