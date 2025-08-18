@@ -54,17 +54,21 @@ def main():
         df_l1c["label"] = label
         df_l2a["label"] = label
 
+    # Filter by tile
+    tiles_to_keep = ["T32TQQ", "T32TQR"]
+    df_l2a = df_l2a[df_l2a["tile_name"].isin(tiles_to_keep)]
+
     # Save full datasets
     # df_l1c.to_csv(f"{env['DATASET_DIR']}/input_l1c.csv")
     df_l2a.to_csv(f"{env['DATASET_DIR']}/output_l2a.csv")
 
     # Compute coverage ratio of image
-    df_l2a['coverage_ratio'] = df_l2a['GeoFootprint'].apply(lambda gf: compute_coverage_ratio(gf, bbox))
 
+    df_l2a['coverage_ratio'] = df_l2a['GeoFootprint'].apply(lambda gf: compute_coverage_ratio(gf, bbox))
     # Filter by threshold
     coverage_threshold = 0.7
     df_l2a_filtered = df_l2a[df_l2a['coverage_ratio'] > coverage_threshold].copy()
-    df_l2a_filtered.to_csv(f"{env['DATASET_DIR']}/output_l2a_filtered.csv")
+    #df_l2a_filtered.to_csv(f"{env['DATASET_DIR']}/output_l2a_filtered.csv")
 
     # Validate alignment
     # validate_data_alignment(df_l1c, df_l2a)

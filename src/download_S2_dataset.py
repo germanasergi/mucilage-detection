@@ -11,7 +11,8 @@ from tqdm import tqdm
 from eopf.common.constants import OpeningMode
 from eopf.common.file_utils import AnyPath
 from eopf.store.convert import convert
-from eopf.common.file_utils import AnyPath
+import shutil
+import glob
 from datetime import datetime
 from sklearn.utils import shuffle
 
@@ -85,6 +86,7 @@ def prepare_paths(path_dir):
 
 def download_sentinel_data(df_output, base_dir, access_key, secret_key, endpoint_url):
     """Download Sentinel data from S3 to local directories"""
+
     input_dir = os.path.join(base_dir, "input")
     output_dir = os.path.join(base_dir, "target")
     os.makedirs(input_dir, exist_ok=True)
@@ -111,10 +113,24 @@ def download_sentinel_data(df_output, base_dir, access_key, secret_key, endpoint
             zarr_filename = os.path.basename(product_url).replace('.SAFE', '.zarr')
             zarr_path = os.path.join(output_dir, zarr_filename)
 
+            # Skip if file already exists
+            if os.path.exists(zarr_path):
+                logger.info(f"Skipping download, .zarr already exists: {zarr_path}")
+                continue
+            
             logger.info(f"Downloading target: {product_url} -> {zarr_path}")
             convert(AnyPath(product_url, **S3_CONFIG), zarr_path, target_store_kwargs=target_store_config)
         except Exception as e:
             logger.error(f"Error downloading {product_url if product_url else 'unknown URL'}: {e}")
+        finally:
+            # Cleanup SAFE temp dirs left in /tmp
+            tmp_safes = glob.glob("/tmp/*.SAFE")
+            for safe_dir in tmp_safes:
+                try:
+                    shutil.rmtree(safe_dir, ignore_errors=True)
+                    logger.info(f"Cleaned up temporary SAFE: {safe_dir}")
+                except Exception as ce:
+                    logger.warning(f"Could not clean temp SAFE {safe_dir}: {ce}")
 
 
         
