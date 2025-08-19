@@ -3,7 +3,7 @@ from loguru import logger
 import os 
 import ast
 
-from generate_ds import load_config, setup_environment, save_config_copy, setup_logger, query_sentinel_data, queries_curation, validate_data_alignment, retrieve_tile_name, parse_geofootprint, compute_coverage_ratio
+from utils.generate_ds import load_config, setup_environment, save_config_copy, setup_logger, query_sentinel_data, queries_curation, validate_data_alignment, retrieve_tile_name, parse_geofootprint, compute_coverage_ratio
 
 def main():
     config_path = '/home/ubuntu/mucilage_pipeline/mucilage-detection/src/cfg/config_dataset.yaml'
