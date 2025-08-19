@@ -1,6 +1,6 @@
 # Sentinel-2 pipeline for Mucilage Detection
 The repository provides a pipeline for mucilage detection, including download of Sentinel-2 imagery, creation of the dataset and classification using an AI model.
-Sentinel-2 satellite imagery are browsed and viewed from the Copernicus Data Space Ecosystem. You can search by coordinates, select various landscapes, and filter by cloud cover. This part was mainly inspired by Sébastien Tétaud's repositories.
+Sentinel-2 satellite imagery are browsed and viewed from the Copernicus Data Space Ecosystem. You can search by coordinates, select various landscapes, and filter by cloud cover. This part was mainly inspired by [Sébastien Tétaud](https://github.com/sebastien-tetaud)'s repositories.
 Sentinel-2 files are converted on the flight from SAFE to zarr.
 Some data analytics are available in sentinel_analytics.ipynb.
 
