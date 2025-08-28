@@ -2,7 +2,7 @@ index,label
 0,mucilage
 1,mucilage
 2,algae
-3,algae
+3,mucilage
 4,clean_water
 5,algae
 6,clean_water
@@ -26,7 +26,7 @@ index,label
 27,mucilage
 28,mucilage
 29,clean_water
-30,algae
+30,mucilage
 31,clean_water
 32,mucilage
 33,clean_water
@@ -41,7 +41,7 @@ index,label
 43,mucilage
 44,mucilage
 45,clean_water
-46,algae
+46,mucilage
 47,clean_water
 48,mucilage
 49,clean_water
@@ -60,7 +60,7 @@ index,label
 66,mucilage
 67,algae
 69,mucilage
-70,algae
+70,mucilage
 71,algae
 72,algae
 73,algae
@@ -878,12 +878,8 @@ index,label
 1384,clean_water
 1597,clean_water
 238,clean_water
-239,algae
 249,clean_water
-258,algae
-270,algae
 283,clean_water
-286,algae
 289,clean_water
 292,clean_water
 299,clean_water
@@ -910,7 +906,6 @@ index,label
 741,clean_water
 744,algae
 759,clean_water
-781,algae
 784,clean_water
 785,clean_water
 802,clean_water
