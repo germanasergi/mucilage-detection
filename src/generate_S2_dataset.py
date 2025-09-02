@@ -55,7 +55,7 @@ def main():
         df_l2a["label"] = label
 
     # Filter by tile
-    tiles_to_keep = ["T32TQQ"] #, "T32TQR"
+    tiles_to_keep = ["T32TQR"] #, "T32TQR"
     df_l2a = df_l2a[df_l2a["tile_name"].isin(tiles_to_keep)]
 
     # Save full datasets
