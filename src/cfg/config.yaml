@@ -1,0 +1,24 @@
+DATASET:
+  version: "V4"
+  base_dir: "/mnt/disk/dataset/sentinel-ai-processor"
+  bands : ['b02', 'b03', 'b04', 'b8a', 'b11', 'b12', 'amei']
+  res : "10m"
+
+ENDPOINTS:
+  url: "ttps://eodata.dataspace.copernicus.eu"
+  stac: "https://stac.dataspace.copernicus.eu/v1/"
+  bucket_name: "eodata"
+
+MODEL:
+  model_name: "CNN"
+  log_features: False
+
+
+TRAINING:
+  optim: "Adam"
+  learning_rate: 0.0001
+  scheduler: True
+  scheduler_type: "ReduceLROnPlateau"
+  factor: 0.5
+  patience: 5
+  num_epochs: 50

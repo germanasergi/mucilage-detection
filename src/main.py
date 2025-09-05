@@ -1,0 +1,217 @@
+import os
+from datetime import datetime
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import yaml
+from loguru import logger
+from tqdm import tqdm
+
+from dataset.dataset import Sentinel2PatchDataset
+from dataset.loader import define_loaders
+from model_zoo.models import define_model, CNN
+#from training.metrics import MultiSpectralMetrics, avg_metric_bands
+
+def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
+    df = pd.read_csv(labels_file)
+
+    # first split train vs test
+    df_train, df_tmp = train_test_split(
+        df, test_size=test_size, stratify=df["label"], random_state=seed
+    )
+    # then split train vs val
+    df_test, df_val = train_test_split(
+        df_tmp, test_size=val_size, stratify=df_tmp["label"], random_state=seed
+    )
+    return df_train, df_val, df_test
+
+
+def prepare_data(df_train, df_val, df_test, bands, batch_size=32, num_workers=1):
+    train_ds = Sentinel2PatchDataset(df_train, bands=bands)
+    val_ds   = Sentinel2PatchDataset(df_val, bands=bands)
+    test_ds  = Sentinel2PatchDataset(df_test, bands=bands)
+
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    test_loader  = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    return train_loader, val_loader, test_loader
+
+
+def build_model(config, num_classes):
+    """
+    Build a classification model (CNN or other architectures).
+    """
+    in_channels = len(config['DATASET']['bands'])
+
+    if config['MODEL']['model_name'] == "CNN":
+        logger.info(f"Using CNN with in_channels={in_channels}, num_classes={num_classes}")
+        model = CNN(
+            num_classes=num_classes,
+            in_channels=in_channels,
+            log_features=config['MODEL'].get('log_features', False)
+        )
+    else:
+        raise ValueError(f"Unknown model: {config['MODEL']['model_name']}")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    return model, device
+
+
+def build_opt(model, config, y=None, device="cpu"):
+    """
+    Build optimizer, criterion and scheduler.
+    - Supports weighted loss if labels `y` are provided.
+    """
+    # ----- Optimizer -----
+    optimizer_class = getattr(optim, config['TRAINING']['optim'])
+    optimizer = optimizer_class(
+        model.parameters(),
+        lr=float(config['TRAINING']['learning_rate'])
+    )
+
+    # ----- Scheduler -----
+    scheduler_class = None
+    if config['TRAINING'].get('scheduler', False):
+        lr_scheduler = getattr(optim.lr_scheduler, config['TRAINING']['scheduler_type'])
+        scheduler_class = lr_scheduler(
+            optimizer,
+            mode='min',
+            factor=config['TRAINING']['factor'],
+            patience=config['TRAINING'].get('patience', 5)
+        )
+        logger.info(f"Scheduler: {config['TRAINING']['scheduler_type']}")
+
+    # ----- Loss function -----
+    if y is not None:
+        class_counts = np.bincount(y)
+        weights = 1.0 / class_counts
+        weights = torch.tensor(weights, dtype=torch.float).to(device)
+        logger.info(f"Using weighted CrossEntropyLoss with weights={weights}")
+        criterion = nn.CrossEntropyLoss(weight=weights)
+    else:
+        criterion = nn.CrossEntropyLoss()
+
+    return optimizer, criterion, scheduler_class
+
+
+def train_one_epoch(model, dataloader, optimizer, criterion, device):
+    model.train()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+
+    for inputs, labels in tqdm(dataloader, desc="Training", leave=False):
+        inputs, labels = inputs.to(device), labels.to(device)
+
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item() * inputs.size(0)
+        _, predicted = torch.max(outputs, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+    epoch_loss = running_loss / total
+    epoch_acc = correct / total
+    return epoch_loss, epoch_acc
+
+def evaluate_model(model, val_loader, criterion, device):
+    model.eval()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for inputs, labels in tqdm(val_loader, desc="Validation", leave=False):
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+
+            running_loss += loss.item() * inputs.size(0)
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    epoch_loss = running_loss / total
+    epoch_acc = correct / total
+    return epoch_loss, epoch_acc
+
+def test_model(model, test_loader, criterion, device):
+    model.eval()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for inputs, labels in tqdm(test_loader, desc="Testing", leave=False):
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+
+            running_loss += loss.item() * inputs.size(0)
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    epoch_loss = running_loss / total
+    epoch_acc = correct / total
+    return epoch_loss, epoch_acc
+
+
+def main():
+
+    dir_path = os.getcwd()
+    config_path = os.path.join(dir_path,"cfg/config.yaml")
+    config = load_config(config_path=config_path)
+
+    # Parameters from config
+    bands = config['DATASET']['bands']
+    num_epochs = config['TRAINING']['num_epochs']
+    batch_size = config['TRAINING']['batch_size']
+
+    # Data 
+    df = pd.read_csv("patches_coordinates.csv")  # top-left corners of patches + labels (optional)
+    df_train, df_val, df_test = split_data(df)
+    train_loader, val_loader, test_loader = prepare_data(df_train, df_val, df_test, bands, batch_size)
+
+    # Labels
+    if "label" in df_train.columns:
+        y_train = df_train["label"].values
+        num_classes = len(np.unique(y_train))
+    else:
+        y_train = None
+        num_classes = config['MODEL'].get('num_classes', 2)  # fallback for inference
+
+    # Model, optimizer, criterion
+    model, device = build_model(config, num_classes=num_classes)
+    optimizer, criterion, scheduler = build_opt(model, config, y=y_train, device=device)
+
+    # Training loop
+    for epoch in range(num_epochs):
+        train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, criterion, device)
+        val_loss, val_acc = evaluate(model, val_loader, criterion, device)
+
+        print(f"Epoch {epoch+1}/{num_epochs} "
+              f"| Train loss: {train_loss:.4f}, acc: {train_acc:.3f} "
+              f"| Val loss: {val_loss:.4f}, acc: {val_acc:.3f}")
+
+        if scheduler:
+            scheduler.step(val_loss)  # assumes ReduceLROnPlateau
+
+    # Final test evaluation
+    if "label" in df_test.columns:
+        test_loss, test_acc = evaluate(model, test_loader, criterion, device)
+        print(f"Test loss: {test_loss:.4f}, Test acc: {test_acc:.3f}")
+    else:
+        print("No labels in test set → skipping evaluation.")
+
+if __name__ == "__main__":
+    main()

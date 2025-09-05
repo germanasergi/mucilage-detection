@@ -40,12 +40,17 @@ SECRET_ACCESS_KEY=password
 
 
 
-## Generate dataset
+## Generate S2 dataset
 ```bash
-python src/generate_S2_dataset.py
+python src/generate_dataset/generate_S2_dataset.py
 ```
 
 ## Download dataset
 ```bash
-python src/download_S2_dataset.py --config /mucilage-detection/data/adr_test/config_dataset_20250818_120134.yaml --l2a-csv /mucilage-detection/data/adr_test/output_l2a.csv
+python src/generate_dataset/download_S2_dataset.py --config /mucilage-detection/data/adr_test/config_dataset_20250818_120134.yaml --l2a-csv /mucilage-detection/data/adr_test/output_l2a.csv
+```
+
+## Generate patches from images
+```bash
+python src/dataset/patches.py
 ```
