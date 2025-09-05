@@ -1,0 +1,2 @@
+zarr_path,x,y,label
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,6444,4016,clean_water
