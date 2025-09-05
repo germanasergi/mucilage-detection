@@ -1,18 +1,21 @@
 import os
 from datetime import datetime
-
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import yaml
 from loguru import logger
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
+from utils.utils import load_config
 from dataset.dataset import Sentinel2PatchDataset
 from dataset.loader import define_loaders
 from model_zoo.models import define_model, CNN
+from torch.utils.data import DataLoader
 #from training.metrics import MultiSpectralMetrics, avg_metric_bands
 
 def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
@@ -169,7 +172,7 @@ def test_model(model, test_loader, criterion, device):
 def main():
 
     dir_path = os.getcwd()
-    config_path = os.path.join(dir_path,"cfg/config.yaml")
+    config_path = os.path.join(dir_path,"src/cfg/config.yaml")
     config = load_config(config_path=config_path)
 
     # Parameters from config
@@ -178,7 +181,7 @@ def main():
     batch_size = config['TRAINING']['batch_size']
 
     # Data 
-    df = pd.read_csv("patches_coordinates.csv")  # top-left corners of patches + labels (optional)
+    df = "/home/ubuntu/mucilage_pipeline/mucilage-detection/csv/patches_final.csv"  # top-left corners of patches + labels (optional)
     df_train, df_val, df_test = split_data(df)
     train_loader, val_loader, test_loader = prepare_data(df_train, df_val, df_test, bands, batch_size)
 
@@ -192,6 +195,7 @@ def main():
 
     # Model, optimizer, criterion
     model, device = build_model(config, num_classes=num_classes)
+    print(y_train)
     optimizer, criterion, scheduler = build_opt(model, config, y=y_train, device=device)
 
     # Training loop
