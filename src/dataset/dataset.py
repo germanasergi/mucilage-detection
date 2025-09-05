@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 import xarray as xr
 import numpy as np
 import pandas as pd
-from patches import *
+from dataset.patches import *
 
 class Sentinel2PatchDataset(Dataset):
     def __init__(self, df, bands, patch_size=256, transform=None):
