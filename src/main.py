@@ -32,7 +32,7 @@ def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
     return df_train, df_val, df_test
 
 
-def prepare_data(df_train, df_val, df_test, bands, batch_size=32, num_workers=2):
+def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2):
     train_ds = Sentinel2NumpyDataset(df_train, bands=bands)
     val_ds   = Sentinel2NumpyDataset(df_val, bands=bands)
     test_ds  = Sentinel2NumpyDataset(df_test, bands=bands)
@@ -225,10 +225,9 @@ def main():
         if scheduler:
             scheduler.step(val_loss)
 
-    # Save metrics to CSV
+    # # Save metrics to CSV
     df_hist = pd.DataFrame(history)
-    df_hist_path = os.path.join(dir_path,"csv/training_metrics.csv")
-    df_hist.to_csv("/home/ubuntu/mucilage_pipeline/mucilage-detection/csv/training_metrics.csv", index=False)
+    df_hist.to_csv(os.path.join(dir_path,"training_metrics.csv"), index=False)
 
     # Final test evaluation
     if "label" in df_test.columns:

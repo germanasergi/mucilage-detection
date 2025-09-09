@@ -15,7 +15,7 @@ MODEL:
 
 
 TRAINING:
-  batch_size: 32
+  batch_size: 64
   optim: "Adam"
   learning_rate: 0.0001
   scheduler: False
