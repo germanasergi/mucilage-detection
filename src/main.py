@@ -12,7 +12,7 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
 from utils.utils import load_config
-from dataset.dataset import Sentinel2PatchDataset
+from dataset.dataset import Sentinel2PatchDataset, Sentinel2NumpyDataset
 from dataset.loader import define_loaders
 from model_zoo.models import define_model, CNN
 from torch.utils.data import DataLoader
@@ -32,10 +32,18 @@ def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
     return df_train, df_val, df_test
 
 
-def prepare_data(df_train, df_val, df_test, bands, batch_size=32, num_workers=1):
-    train_ds = Sentinel2PatchDataset(df_train, bands=bands)
-    val_ds   = Sentinel2PatchDataset(df_val, bands=bands)
-    test_ds  = Sentinel2PatchDataset(df_test, bands=bands)
+def prepare_data(df_train, df_val, df_test, bands, batch_size=32, num_workers=2):
+    train_ds = Sentinel2NumpyDataset(df_train, bands=bands)
+    val_ds   = Sentinel2NumpyDataset(df_val, bands=bands)
+    test_ds  = Sentinel2NumpyDataset(df_test, bands=bands)
+
+    # Normalize
+    mean = np.nanmean(train_ds.X, axis=(0,1,2))
+    std  = np.nanstd(train_ds.X, axis=(0,1,2))
+    train_ds.X = (train_ds.X - mean) / std
+    val_ds.X  = (val_ds.X - mean) / std
+    test_ds.X = (test_ds.X - mean) / std
+
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
@@ -181,7 +189,7 @@ def main():
     batch_size = config['TRAINING']['batch_size']
 
     # Data 
-    df = "/home/ubuntu/mucilage_pipeline/mucilage-detection/csv/patches_final.csv"  # top-left corners of patches + labels (optional)
+    df = os.path.join(dir_path,"csv/patches_final.csv")  # top-left corners of patches + labels (optional)
     df_train, df_val, df_test = split_data(df)
     train_loader, val_loader, test_loader = prepare_data(df_train, df_val, df_test, bands, batch_size)
 
@@ -195,24 +203,36 @@ def main():
 
     # Model, optimizer, criterion
     model, device = build_model(config, num_classes=num_classes)
-    print(y_train)
     optimizer, criterion, scheduler = build_opt(model, config, y=y_train, device=device)
 
     # Training loop
+    history = {"epoch": [], "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+
     for epoch in range(num_epochs):
         train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, criterion, device)
-        val_loss, val_acc = evaluate(model, val_loader, criterion, device)
+        val_loss, val_acc = evaluate_model(model, val_loader, criterion, device)
 
         print(f"Epoch {epoch+1}/{num_epochs} "
               f"| Train loss: {train_loss:.4f}, acc: {train_acc:.3f} "
               f"| Val loss: {val_loss:.4f}, acc: {val_acc:.3f}")
 
+        history["epoch"].append(epoch+1)
+        history["train_loss"].append(train_loss)
+        history["train_acc"].append(train_acc)
+        history["val_loss"].append(val_loss)
+        history["val_acc"].append(val_acc)
+
         if scheduler:
-            scheduler.step(val_loss)  # assumes ReduceLROnPlateau
+            scheduler.step(val_loss)
+
+    # Save metrics to CSV
+    df_hist = pd.DataFrame(history)
+    df_hist_path = os.path.join(dir_path,"csv/training_metrics.csv")
+    df_hist.to_csv("/home/ubuntu/mucilage_pipeline/mucilage-detection/csv/training_metrics.csv", index=False)
 
     # Final test evaluation
     if "label" in df_test.columns:
-        test_loss, test_acc = evaluate(model, test_loader, criterion, device)
+        test_loss, test_acc = evaluate_model(model, test_loader, criterion, device)
         print(f"Test loss: {test_loss:.4f}, Test acc: {test_acc:.3f}")
     else:
         print("No labels in test set → skipping evaluation.")

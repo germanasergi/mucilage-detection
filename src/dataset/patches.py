@@ -121,7 +121,7 @@ def sample_patch_corners(water_mask, n_patches, patch_size=256, border_weight=0.
     return corners
 
 
-def create_patches_dataframe(zarr_files, bands, n_patches_per_file=150, patch_size=256):
+def create_patches_dataframe(zarr_files, n_patches_per_file=150, patch_size=256):
     """
     For each zarr file, extract top-left coordinates of sampled patches,
     and store them along with zarr path in a DataFrame.
@@ -160,19 +160,16 @@ def create_patches_dataframe(zarr_files, bands, n_patches_per_file=150, patch_si
 
 def main():
     # Directory containing .zarr files
-    BASE_DIR = "/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test"
-    DATA_DIR = os.path.join(BASE_DIR, "target")
+    BASE_DIR = "/home/ubuntu/mucilage_pipeline/mucilage-detection"
+    DATA_DIR = os.path.join(BASE_DIR, "data/adr_test/target")
     zarr_files = glob.glob(os.path.join(DATA_DIR, "*.zarr"))
 
     # Fix seed
-    np.random.seed(42)  
-
-    # Define bands to include in the stack
-    bands = ["b02", "b03", "b04", "b08", "b11", "b12", "amei"]
+    np.random.seed(42)
 
     # Create patches DataFrame
-    df_patches = create_patches_dataframe(zarr_files, bands, n_patches_per_file=100, patch_size=256)
-    df_patches.to_csv(os.path.join(BASE_DIR, "patches.csv"), index=False)
+    df_patches = create_patches_dataframe(zarr_files, n_patches_per_file=100, patch_size=256)
+    df_patches.to_csv(os.path.join(BASE_DIR, "csv/patches.csv"), index=False)
 
 if __name__ == "__main__":
     main()
