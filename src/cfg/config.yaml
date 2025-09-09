@@ -1,6 +1,6 @@
 DATASET:
   version: "V4"
-  base_dir: "/mnt/disk/dataset/sentinel-ai-processor"
+  base_dir: "home/ubuntu/mucilage_pipeline/mucilage-detection"
   bands : ['b02', 'b03', 'b04', 'b8a', 'b11', 'b12', 'amei']
   res : "10m"
 
@@ -18,7 +18,7 @@ TRAINING:
   batch_size: 32
   optim: "Adam"
   learning_rate: 0.0001
-  scheduler: True
+  scheduler: False
   scheduler_type: "ReduceLROnPlateau"
   factor: 0.5
   patience: 5
