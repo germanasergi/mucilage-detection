@@ -18,37 +18,37 @@ def compute_amei(ds, eps=1e-6):
 
     return amei.rename("amei") 
 
-# # df_patches contains columns: ['zarr_path', 'x', 'y', 'label']
-# patch_size = 256
-# patches_csv = "/home/ubuntu/mucilage_pipeline/mucilage-detection/csv/patches_final.csv"  # CSV with columns: ['zarr_path', 'x', 'y', 'label']
-# df_patches = pd.read_csv(patches_csv)
+# df_patches contains columns: ['zarr_path', 'x', 'y', 'label']
+patch_size = 256
+patches_csv = "/home/ubuntu/mucilage_pipeline/mucilage-detection/csv/patches_final.csv"  # CSV with columns: ['zarr_path', 'x', 'y', 'label']
+df_patches = pd.read_csv(patches_csv)
 
 
-# y_true = []
-# y_score = []  # continuous (max AMEI in patch)
+y_true = []
+y_score = []  # continuous (max AMEI in patch)
 
-# for _, row in tqdm(df_patches.iterrows(), total=len(df_patches)):
-#     zarr_path = row['zarr_path']
-#     x, y = row['x'], row['y']
-#     label = row['label']
+for _, row in tqdm(df_patches.iterrows(), total=len(df_patches)):
+    zarr_path = row['zarr_path']
+    x, y = row['x'], row['y']
+    label = row['label']
 
-#     ds = xr.open_datatree(zarr_path, engine="zarr", mask_and_scale=False, chunks={})
-#     amei_map = compute_amei(ds)
-#     patch_amei = amei_map[y:y+patch_size, x:x+patch_size]
-#     ds.close()
+    ds = xr.open_datatree(zarr_path, engine="zarr", mask_and_scale=False, chunks={})
+    amei_map = compute_amei(ds)
+    patch_amei = amei_map[y:y+patch_size, x:x+patch_size]
+    ds.close()
 
-#     mac = np.nanmax(patch_amei)
-#     y_true.append(label)
-#     y_score.append(mac)
+    mac = np.nanmax(patch_amei)
+    y_true.append(label)
+    y_score.append(mac)
 
-# y_true = np.array(y_true)
-# y_score = np.array(y_score)
+y_true = np.array(y_true)
+y_score = np.array(y_score)
 
-# np.save("y_true.npy", y_true)
-# np.save("y_score_amei.npy", y_score)
+np.save("y_true.npy", y_true)
+np.save("y_score_amei.npy", y_score)
 
-y_true = np.load("y_true.npy")
-y_score = np.load("y_score_amei.npy")
+# y_true = np.load("y_true.npy")
+# y_score = np.load("y_score_amei.npy")
 
 # sweep thresholds for F1 
 thresholds = np.linspace(0, 1, 10)
