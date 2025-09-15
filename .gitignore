@@ -9,6 +9,3 @@
 
 # Ignore output plots
 **/plots/
-
-# Temporay: ignore labeling notebook
-**/notebooks/labeling.ipynb
