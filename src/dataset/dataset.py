@@ -7,57 +7,67 @@ from tqdm import tqdm
 from dataset.patches import *
 
 class Sentinel2PatchDataset(Dataset):
+    """
+    PyTorch Dataset to extract 256x256 patches from Sentinel-2 Zarr files
+    based on coordinates provided in a CSV.
+    """
+
     def __init__(self, df, bands, patch_size=256, transform=None):
         """
         Args:
-            df (pd.DataFrame): must contain:
-                - 'zarr_path' : path to the .zarr file
-                - 'x' : top-left col
-                - 'y' : top-left row
-                - 'label' (optional): class label
-            bands (list): list of band names
-            patch_size (int): size of patches to extract
-            transform (callable): optional transform (augmentations)
+            df (pd.DataFrame): CSV containing columns ["zarr_path", "x", "y", "label"].
+            bands (list): List of bands to extract.
+            patch_size (int): Size of the patch to extract (patch_size x patch_size).
+            transform (callable, optional): Optional transform applied to the patch.
         """
         self.df = df.reset_index(drop=True)
         self.bands = bands
         self.patch_size = patch_size
         self.transform = transform
-        self.has_labels = "label" in self.df.columns
+
+        # Build an index mapping zarr_path -> list of row indices for faster access
+        self.path_groups = {
+            z: group.index.tolist() for z, group in self.df.groupby("zarr_path")
+        }
+
+        # Flattened list of (zarr_path, row_index) to index dataset
+        self.indices = [
+            (z, idx) for z, group in self.path_groups.items() for idx in group
+        ]
 
     def __len__(self):
-        return len(self.df)
+        return len(self.indices)
 
     def __getitem__(self, idx):
-        print(f"Fetching patch {idx}")
-        row = self.df.iloc[idx]
-        zarr_path, x, y = row["zarr_path"], row["x"], row["y"]
+        zarr_path, row_idx = self.indices[idx]
+        print(f"Loading patch from {zarr_path}, row {row_idx}")
+        row = self.df.loc[row_idx]
 
-        # open zarr, build stack
-        with xr.open_datatree(zarr_path, engine="zarr", mask_and_scale=False, chunks={}) as ds:
-            stack = build_stack_10m(ds, self.bands)
-            patch = stack.isel(
-                y=slice(y, y + self.patch_size),
-                x=slice(x, x + self.patch_size)
-            ).to_numpy()
+        # Open Zarr (datatree) once per patch access
+        ds = xr.open_datatree(zarr_path, engine="zarr", mask_and_scale=False, chunks={})
+        stack = build_stack_10m(ds, self.bands)  # (H, W, C)
+
+        x, y, label = row["x"], row["y"], row["label"]
 
         patch = stack.isel(
             y=slice(y, y + self.patch_size),
             x=slice(x, x + self.patch_size)
-        ).to_numpy()
+        ).to_numpy().astype(np.float32)
+
         ds.close()
 
-        # convert to torch tensor [C, H, W]
-        patch = torch.from_numpy(patch).permute(2, 0, 1).float()
+        # Skip invalid patches
+        if np.isnan(patch).any() or np.isinf(patch).any():
+            raise ValueError(f"Invalid patch at {zarr_path}, row {row_idx}")
+
+        # Convert to torch tensor [C, H, W]
+        patch_tensor = torch.from_numpy(patch).permute(2, 0, 1).float()
+        label_tensor = torch.tensor(label, dtype=torch.long)
 
         if self.transform:
-            patch = self.transform(patch)
+            patch_tensor = self.transform(patch_tensor)
 
-        if self.has_labels:
-            label = torch.tensor(row["label"], dtype=torch.long)
-            return patch, label
-        else:
-            return patch
+        return patch_tensor, label_tensor
 
 
 class Sentinel2NumpyDataset(Dataset):
@@ -90,20 +100,18 @@ class Sentinel2NumpyDataset(Dataset):
 
             for _, row in group.iterrows():
                 x, y, label = row["x"], row["y"], row["label"]
-
                 patch = stack.isel(
                     y=slice(y, y + self.patch_size),
                     x=slice(x, x + self.patch_size)
-                ).to_numpy().astype(np.float32)  # (H, W, C)
+                ).to_numpy().astype(np.float32)
 
                 if np.isnan(patch).any() or np.isinf(patch).any():
-                    continue  # skip invalid patches
+                    continue 
 
                 all_patches.append(patch)
                 all_labels.append(label)
 
             ds.close()
-            print(f"Loaded {len(all_patches)} patches so far...")
 
         X = np.stack(all_patches, axis=0)   # (N, H, W, C)
         y = np.array(all_labels)

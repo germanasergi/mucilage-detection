@@ -208,7 +208,7 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2A_MSIL2A_20240716T100601_N0510_R022_T32TQQ_20240716T160254.zarr,9208,6375,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2A_MSIL2A_20240716T100601_N0510_R022_T32TQQ_20240716T160254.zarr,8790,703,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2A_MSIL2A_20240716T100601_N0510_R022_T32TQQ_20240716T160254.zarr,10445,7211,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2A_MSIL2A_20240716T100601_N0510_R022_T32TQQ_20240716T160254.zarr,9424,8527,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2A_MSIL2A_20240716T100601_N0510_R022_T32TQQ_20240716T160254.zarr,9424,8527,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2A_MSIL2A_20240716T100601_N0510_R022_T32TQQ_20240716T160254.zarr,10686,7266,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2A_MSIL2A_20240716T100601_N0510_R022_T32TQQ_20240716T160254.zarr,8824,673,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2A_MSIL2A_20240716T100601_N0510_R022_T32TQQ_20240716T160254.zarr,8643,711,1
@@ -652,7 +652,7 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240618T095549_N0510_R122_T32TQQ_20240618T124428.zarr,6937,4324,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240618T095549_N0510_R122_T32TQQ_20240618T124428.zarr,8090,6527,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240618T095549_N0510_R122_T32TQQ_20240618T124428.zarr,10521,7610,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240618T095549_N0510_R122_T32TQQ_20240618T124428.zarr,8819,9366,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240618T095549_N0510_R122_T32TQQ_20240618T124428.zarr,8819,9366,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240618T095549_N0510_R122_T32TQQ_20240618T124428.zarr,9204,7144,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240618T095549_N0510_R122_T32TQQ_20240618T124428.zarr,9058,8274,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240618T095549_N0510_R122_T32TQQ_20240618T124428.zarr,7787,5652,0
@@ -736,7 +736,7 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQQ_20240628T124047.zarr,9702,2223,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQQ_20240628T124047.zarr,9023,1973,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQQ_20240628T124047.zarr,7787,9379,1
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQQ_20240628T124047.zarr,7364,4655,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQQ_20240628T124047.zarr,7364,4655,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQQ_20240628T124047.zarr,9393,6371,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQQ_20240628T124047.zarr,10224,9240,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQQ_20240628T124047.zarr,7506,5275,1
@@ -814,7 +814,7 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQR_20240628T124047.zarr,6811,9462,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQR_20240628T124047.zarr,7631,9363,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQR_20240628T124047.zarr,10487,8560,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQR_20240628T124047.zarr,9998,5735,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQR_20240628T124047.zarr,9998,5735,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQR_20240628T124047.zarr,10454,4840,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQR_20240628T124047.zarr,9563,10335,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240628T095549_N0510_R122_T32TQR_20240628T124047.zarr,8474,9587,1
@@ -1009,7 +1009,7 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240718T095549_N0510_R122_T32TQQ_20240718T124043.zarr,7380,5781,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240718T095549_N0510_R122_T32TQQ_20240718T124043.zarr,10672,8989,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240718T095549_N0510_R122_T32TQQ_20240718T124043.zarr,9235,10035,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240718T095549_N0510_R122_T32TQQ_20240718T124043.zarr,6238,3993,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240718T095549_N0510_R122_T32TQQ_20240718T124043.zarr,6238,3993,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240718T095549_N0510_R122_T32TQQ_20240718T124043.zarr,7694,2997,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240718T095549_N0510_R122_T32TQQ_20240718T124043.zarr,10155,6630,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240718T095549_N0510_R122_T32TQQ_20240718T124043.zarr,6751,4323,0
@@ -1251,7 +1251,7 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,6976,7290,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,10442,66,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,9219,10373,1
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,10259,2311,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,10259,2311,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,6478,5444,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,9703,4550,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,8847,3224,1
@@ -1284,7 +1284,7 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,10484,3554,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,10309,4147,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,9652,8608,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,9356,3116,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,9356,3116,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,9972,5622,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,7687,8309,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQQ_20240728T114034.zarr,7638,600,0
@@ -1323,11 +1323,11 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,8387,6373,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,8174,10660,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,8135,7801,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,7222,9099,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,7222,9099,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,9240,6589,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,6025,8648,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,10512,5959,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,10388,10529,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,10388,10529,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,9191,10288,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,10194,7107,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,7261,10371,0
@@ -1339,14 +1339,14 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,7806,6800,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,9705,10418,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,9319,8937,1
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,6921,8232,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,6921,8232,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,6661,8479,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,9016,5707,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,10711,9216,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,8189,8943,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,8800,6664,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,8980,9652,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,7547,9657,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,7547,9657,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,8940,10278,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,9256,7906,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240728T095549_N0511_R122_T32TQR_20240728T114034.zarr,10012,7851,0
@@ -1398,8 +1398,8 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,7009,6733,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,9743,6645,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,10407,4896,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,7330,8348,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,6348,7782,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,7330,8348,1
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,6348,7782,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,9288,6611,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,10542,10225,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,9171,6389,0
@@ -1433,7 +1433,7 @@ zarr_path,x,y,label
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,7068,6403,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,8882,5414,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,9379,10154,0
-/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,6928,8482,0
+/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,6928,8482,1
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,9746,6936,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,8899,6990,0
 /home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_test/target/S2B_MSIL2A_20240731T100559_N0511_R022_T32TQR_20240731T125141.zarr,9408,9038,1

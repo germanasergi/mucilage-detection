@@ -32,7 +32,7 @@ def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
     return df_train, df_val, df_test
 
 
-def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2):
+def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=4):
     train_ds = Sentinel2NumpyDataset(df_train, bands=bands)
     val_ds   = Sentinel2NumpyDataset(df_val, bands=bands)
     test_ds  = Sentinel2NumpyDataset(df_test, bands=bands)
@@ -179,9 +179,13 @@ def test_model(model, test_loader, criterion, device):
 
 def main():
 
-    dir_path = os.getcwd()
-    config_path = os.path.join(dir_path,"src/cfg/config.yaml")
-    config = load_config(config_path=config_path)
+    SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+    BASE_DIR = os.path.dirname(SRC_DIR)
+
+    CFG_DIR = os.path.join(SRC_DIR, 'cfg')
+    CSV_DIR = os.path.join(BASE_DIR, 'csv')
+
+    config = load_config(config_path=os.path.join(CFG_DIR, 'config.yaml'))
 
     # Parameters from config
     bands = config['DATASET']['bands']
@@ -189,7 +193,7 @@ def main():
     batch_size = config['TRAINING']['batch_size']
 
     # Data 
-    df = os.path.join(dir_path,"csv/patches_final.csv")  # top-left corners of patches + labels (optional)
+    df = os.path.join(CSV_DIR, "patches_final.csv")  # top-left corners of patches + labels (optional)
     df_train, df_val, df_test = split_data(df)
     train_loader, val_loader, test_loader = prepare_data(df_train, df_val, df_test, bands, batch_size)
 
@@ -227,7 +231,7 @@ def main():
 
     # # Save metrics to CSV
     df_hist = pd.DataFrame(history)
-    df_hist.to_csv(os.path.join(dir_path,"training_metrics.csv"), index=False)
+    df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics.csv"), index=False)
 
     # Final test evaluation
     if "label" in df_test.columns:

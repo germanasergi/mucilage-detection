@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 import pandas as pd
 import os
 
+
 def load_config(config_path="cfg/config.yaml"):
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
@@ -66,3 +67,16 @@ def remove_last_segment_rsplit(sentinel_id):
     # Split from the right side, max 1 split
     parts = sentinel_id.rsplit('_', 1)
     return parts[0]
+
+def write_zarr_from_safe(safe_path, repo_path):
+    """
+    Convert a Sentinel-2 SAFE folder to a Zarr store inside an Icechunk repository.
+    """
+    # Step 1: Convert SAFE -> Zarr (classic Zarr store)
+    zarr_store_path = Path(repo_path) / f"{Path(safe_path).stem}.zarr"
+    convert_safe_to_zarr(safe_path, zarr_store_path)  # you already had this logic
+
+    # Step 2: Add Zarr store to Icechunk repo
+    repo = Repository(repo_path)
+    repo.add_dataset(zarr_store_path)
+    repo.commit("Added SAFE -> Zarr dataset")

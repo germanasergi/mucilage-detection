@@ -160,7 +160,7 @@ def create_patches_dataframe(zarr_files, n_patches_per_file=150, patch_size=256)
 
 def main():
     # Directory containing .zarr files
-    BASE_DIR = "/home/ubuntu/mucilage_pipeline/mucilage-detection"
+    BASE_DIR = os.getcwd()
     DATA_DIR = os.path.join(BASE_DIR, "data/adr_test/target")
     zarr_files = glob.glob(os.path.join(DATA_DIR, "*.zarr"))
 
