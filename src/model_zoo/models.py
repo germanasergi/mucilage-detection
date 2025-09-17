@@ -1,6 +1,8 @@
 import segmentation_models_pytorch as smp
+import timm
 import torch.nn as nn
 import torch.nn.functional as F
+from torchgeo.models import get_weight
 
 def define_model(
     name,
@@ -47,6 +49,23 @@ def define_model(
     except AttributeError:
         # If the model name is not found in the library
         raise ValueError(f"Model '{name}' not found in segmentation_models_pytorch. Available models: {dir(smp)}")
+
+
+def build_model(model_name, num_classes, in_channels, pretrained=True, weights=None, freeze_backbone=False):
+    # Create timm model
+    model = timm.create_model(
+        model_name,
+        num_classes=num_classes,
+        in_chans=in_channels,
+        pretrained=pretrained if weights is None else False,
+    )
+    
+    # If using PyTorchGeo weights (remote sensing pretrained)
+    if weights is not None:
+        state_dict = get_weight(weights).get_state_dict(progress=True)
+        load_state_dict_with_flexibility(model, state_dict, strict=False)
+    
+    return model
 
 
 class CNN(nn.Module):

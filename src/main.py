@@ -33,9 +33,9 @@ def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
 
 
 def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=4):
-    train_ds = Sentinel2NumpyDataset(df_train, bands=bands)
-    val_ds   = Sentinel2NumpyDataset(df_val, bands=bands)
-    test_ds  = Sentinel2NumpyDataset(df_test, bands=bands)
+    train_ds = Sentinel2NumpyDataset(df_train, bands, cache_file="train_cache.npz")
+    val_ds   = Sentinel2NumpyDataset(df_val, bands, cache_file="val_cache.npz")
+    test_ds  = Sentinel2NumpyDataset(df_test, bands, cache_file="test_cache.npz")
 
     # Normalize
     mean = np.nanmean(train_ds.X, axis=(0,1,2))
@@ -231,7 +231,7 @@ def main():
 
     # # Save metrics to CSV
     df_hist = pd.DataFrame(history)
-    df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics.csv"), index=False)
+    df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_allbands.csv"), index=False)
 
     # Final test evaluation
     if "label" in df_test.columns:
