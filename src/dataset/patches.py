@@ -8,28 +8,6 @@ import rioxarray
 import glob
 from scipy.ndimage import generate_binary_structure, label, binary_fill_holes, binary_erosion
 
-def resample_to_10m(ds, band, ref, folder):
-    """
-    Resample band to match the resolution & grid of reference band.
-    ds: opened .zarr datatree
-    band: name of band to resample (string)
-    ref: name of reference band (string)
-    """
-    crs_code = "EPSG:32632"
-
-    # Define reference band
-    ref_band = ds[f"measurements/reflectance/r10m/{ref}"]  # reference (10m red)
-    ref_band = ref_band.rio.write_crs(crs_code, inplace=True)
-
-    # Band to convert
-    if folder == 'measurements':
-        band_20m = ds[f"measurements/reflectance/r20m/{band}"]
-    else:
-        band_20m = ds[f"conditions/mask/l2a_classification/r20m/{band}"] # for classification band
-    band_10m = band_20m.rio.write_crs(crs_code, inplace=True)  # ensure CRS
-
-    return band_10m.rio.reproject_match(ref_band)
-
 def compute_amei(ds, eps=1e-6):
     red   = ds["measurements/reflectance/r10m/b04"] / 10000.0
     green = ds["measurements/reflectance/r10m/b03"] / 10000.0
@@ -41,7 +19,6 @@ def compute_amei(ds, eps=1e-6):
     amei  = (2*red + nir - 2*swir) / (denom + eps)
 
     return amei.rename("amei")  # keep DataArray with name
-
 
 
 def clean_water_mask(ds):
@@ -76,6 +53,89 @@ def clean_water_mask(ds):
 
     return sea_filled.astype(bool)
 
+def resample_band(ds, band, target_res="r10m", ref="b04", crs="EPSG:32632"):
+    """
+    Resample any band (reflectance or classification) to target resolution.
+    """
+    ref_band = ds[f"measurements/reflectance/{target_res}/{ref}"].rio.write_crs(crs) # Reference band at target resolution
+
+    if band == "scl":
+        band_da = ds[f"conditions/mask/l2a_classification/r20m/{band}"].rio.write_crs(crs)
+        source_res = "r20m"
+    else:
+        # Detect which reflectance resolution contains the band
+        source_res = next(
+        (r for r in ["r10m", "r20m", "r60m"] if band in ds[f"measurements/reflectance/{r}"]),
+        None
+        )
+        if source_res is None:
+            raise ValueError(f"Band {band} not found in reflectance or scl folder")
+        band_da = ds[f"measurements/reflectance/{source_res}/{band}"].rio.write_crs(crs)
+    # If source == target, no resampling needed
+    if source_res == target_res:
+        return band_da
+
+    return band_da.rio.reproject_match(ref_band)
+
+def resample_to_10m(ds, band, ref, folder, res):
+    """
+    Resample band to match the resolution & grid of reference band.
+    ds: opened .zarr datatree
+    band: name of band to resample (string)
+    ref: name of reference band (string)
+    """
+    crs_code = "EPSG:32632"
+
+    # Define reference band
+    ref_band = ds[f"measurements/reflectance/r10m/{ref}"]  # reference (10m red)
+    ref_band = ref_band.rio.write_crs(crs_code, inplace=True)
+
+    # Band to convert
+    if folder == 'measurements':
+        if res == 'r20m':
+            band_old = ds[f"measurements/reflectance/r20m/{band}"]
+        elif res == 'r60m':
+            band_old = ds[f"measurements/reflectance/r60m/{band}"]
+    else:
+        band_old = ds[f"conditions/mask/l2a_classification/r20m/{band}"] # for classification band
+    band_10m = band_old.rio.write_crs(crs_code, inplace=True)  # ensure CRS
+
+    return band_10m.rio.reproject_match(ref_band) # Nearest neighbor by default
+
+def build_stack(ds, bands, target_res="r10m", ref_band="b04", crs="EPSG:32632"):
+    """
+    Build a lazy dask-backed (H, W, C) stack from bands, resampling as needed.
+
+    Args:
+        ds: xarray Dataset or DataTree
+        bands: list of band names to include
+        target_res: desired output resolution for all bands
+        ref_band: reference band for resampling (default: 'b04' red)
+        crs: CRS to assign if missing
+
+    Returns:
+        xarray.DataArray with dimensions (y, x, band)
+    """
+    stack = []
+
+    for b in bands:
+        if b in ds['measurements/reflectance/r10m'] or \
+           b in ds['measurements/reflectance/r20m'] or \
+           b in ds['measurements/reflectance/r60m']:
+            arr = resample_band(ds, b, target_res=target_res, ref=ref_band, crs=crs) / 10000.0
+        elif b == "amei":
+            arr = compute_amei(ds)
+        else:
+            raise ValueError(f"Band {b} not found or not supported.")
+
+        # Expand dims for stacking
+        arr = arr.expand_dims(band=[b])
+        stack.append(arr)
+
+    # Concatenate all bands along 'band' dimension
+    stacked = xr.concat(stack, dim="band").transpose("y", "x", "band")
+    return stacked
+
 
 def build_stack_10m(ds, bands):
     """
@@ -87,12 +147,18 @@ def build_stack_10m(ds, bands):
         if b in ds['measurements/reflectance/r10m']:
             arr = ds['measurements/reflectance/r10m'][b] / 10000.0
         elif b in ds['measurements/reflectance/r20m']:
-            arr = resample_to_10m(ds, b, 'b04', folder='measurements') / 10000.0
+            res = 'r20m'
+            arr = resample_to_10m(ds, b, 'b04', folder='measurements', res=res) / 10000.0
+        elif b in ds['measurements/reflectance/r60m']:
+            res = 'r60m'
+            arr = resample_to_10m(ds, b, 'b04', folder='measurements', res=res) / 10000.0
         elif b == "amei":
             arr = compute_amei(ds)
         else:
             raise ValueError(f"Band {b} not found or not supported.")
 
+        if "spatial_ref" not in arr.coords:
+            arr = arr.rio.write_crs("EPSG:32632")
         # Expand dims and assign band coordinate for all arrays
         arr = arr.expand_dims(band=[b])
         stack.append(arr)

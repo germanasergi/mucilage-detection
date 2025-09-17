@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 
 dir_path = os.getcwd()
-df = pd.read_csv(os.path.join(dir_path,"training_metrics.csv"))
+df = pd.read_csv(os.path.join(dir_path,"training_metrics_allbands_10.csv"))
 plt.figure(figsize=(12,5))
 
 # Loss

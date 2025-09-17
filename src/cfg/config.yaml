@@ -1,7 +1,7 @@
 DATASET:
   version: "V4"
   base_dir: "home/ubuntu/mucilage_pipeline/mucilage-detection"
-  bands : ['b02', 'b03', 'b04', 'b8a', 'b11', 'b12', 'amei']
+  bands : ['b01','b02', 'b03', 'b04', 'b05', 'b06', 'b07','b08','b8a', 'b11', 'b12']
   res : "10m"
 
 ENDPOINTS:
@@ -22,4 +22,4 @@ TRAINING:
   scheduler_type: "ReduceLROnPlateau"
   factor: 0.5
   patience: 5
-  num_epochs: 50
+  num_epochs: 30

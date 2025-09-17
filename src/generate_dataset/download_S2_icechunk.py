@@ -1,4 +1,5 @@
 import os
+import argparse
 import yaml
 import glob
 import shutil
@@ -64,9 +65,6 @@ def prepare_paths(path_dir):
     logger.info(f"Paths prepared: {len(df_output)} output files")
     return df_output
 
-# ----------------------
-# MAIN DOWNLOAD + CONVERT
-# ----------------------
 
 def convert_safe_to_icechunk(product_url, repo_url, fs, bands):
     """
@@ -94,11 +92,8 @@ def download_sentinel_data(df_output, base_dir, s3_fs, bucket_name, bands):
             product_url_base = row["S3Path"]   # e.g. /eodata/...SAFE
             product_url = "s3://" + product_url_base.lstrip("/")
             icechunk_repo_name = os.path.basename(product_url).replace(".SAFE", ".icechunk")
-
             repo_url = f"s3://{bucket_name}/sentinel2/{icechunk_repo_name}"
-
             logger.info(f"Converting SAFE -> Icechunk: {product_url} -> {repo_url}")
-
             convert_safe_to_icechunk(product_url, repo_url, s3_fs, bands)
 
         except Exception as e:
@@ -110,13 +105,9 @@ def download_sentinel_data(df_output, base_dir, s3_fs, bucket_name, bands):
                 shutil.rmtree(safe_dir, ignore_errors=True)
                 logger.info(f"Cleaned up temporary SAFE: {safe_dir}")
 
-# ----------------------
-# MAIN ENTRY POINT
-# ----------------------
 
 def main():
     load_dotenv()
-    import argparse
     parser = argparse.ArgumentParser(description="Download Sentinel data as Icechunk repos")
     parser.add_argument("--config", type=str, required=True, help="Path to the config file")
     parser.add_argument("--l2a-csv", type=str, required=True, help="Path to L2A CSV file")

@@ -45,7 +45,7 @@ class Sentinel2PatchDataset(Dataset):
 
         # Open Zarr (datatree) once per patch access
         ds = xr.open_datatree(zarr_path, engine="zarr", mask_and_scale=False, chunks={})
-        stack = build_stack_10m(ds, self.bands)  # (H, W, C)
+        stack = build_stack(ds, self.bands, ref_band="b04", target_res="10m")  # (H, W, C)
 
         x, y, label = row["x"], row["y"], row["label"]
 
@@ -71,42 +71,59 @@ class Sentinel2PatchDataset(Dataset):
 
 
 class Sentinel2NumpyDataset(Dataset):
-    def __init__(self, df, bands, patch_size=256, transform=None):
+    def __init__(self, df, bands, patch_size=256, target_res="r60m", transform=None, cache_file=None):
         """
-        Load all patches from .zarr files into memory (NumPy) once,
-        then serve them as a PyTorch Dataset.
-
         Args:
-            csv_path (str): CSV containing columns [zarr_path, x, y, label].
-            bands (list): List of band names to extract.
-            patch_size (int): Patch size to extract.
-            transform (callable): Optional transform on the patch.
+            df (pd.DataFrame): containing [zarr_path, x, y, label].
+            bands (list): Band names to extract.
+            patch_size (int): Patch size.
+            transform (callable): Optional transform.
+            cache_file (str): Optional path to cache file (.npz or .pt).
         """
         self.df = df.reset_index(drop=True)
         self.bands = bands
         self.patch_size = patch_size
+        self.target_res = target_res
         self.transform = transform
+        self.cache_file = cache_file
 
-        self.X, self.y = self._build_numpy_dataset()
+        if self.cache_file and os.path.exists(self.cache_file):
+            # Load cached dataset
+            print(f"Loading cached dataset from {self.cache_file}")
+            cache = np.load(self.cache_file)
+            self.X = cache["X"]
+            self.y = cache["y"]
+        else:
+            # Build dataset from zarr files
+            self.X, self.y = self._build_numpy_dataset()
+            if self.cache_file:
+                print(f"Saving dataset cache to {self.cache_file}")
+                np.savez_compressed(self.cache_file, X=self.X, y=self.y)
 
     def _build_numpy_dataset(self):
         all_patches = []
         all_labels = []
 
-        # group by zarr_path to avoid reopening each patch
         for zarr_path, group in tqdm(self.df.groupby("zarr_path"), desc="Building NumPy dataset"):
             ds = xr.open_datatree(zarr_path, engine="zarr", mask_and_scale=False, chunks={})
-            stack = build_stack_10m(ds, self.bands)
+            stack = build_stack(ds, self.bands,  target_res=self.target_res, ref_band="b01")  # (H, W, C)
 
             for _, row in group.iterrows():
                 x, y, label = row["x"], row["y"], row["label"]
+
+                # Add rescaling in case resolution/=10m
+                factor = {"r10m": 1, "r20m": 2, "r60m": 6}[self.target_res]
+                x_rescaled = x // factor
+                y_rescaled = y // factor
+                patch_size_rescaled = self.patch_size // factor
+
                 patch = stack.isel(
-                    y=slice(y, y + self.patch_size),
-                    x=slice(x, x + self.patch_size)
+                    y=slice(y_rescaled, y_rescaled + patch_size_rescaled),
+                    x=slice(x_rescaled, x_rescaled + patch_size_rescaled)
                 ).to_numpy().astype(np.float32)
 
                 if np.isnan(patch).any() or np.isinf(patch).any():
-                    continue 
+                    continue
 
                 all_patches.append(patch)
                 all_labels.append(label)
@@ -115,7 +132,6 @@ class Sentinel2NumpyDataset(Dataset):
 
         X = np.stack(all_patches, axis=0)   # (N, H, W, C)
         y = np.array(all_labels)
-
         return X, y
 
     def __len__(self):
