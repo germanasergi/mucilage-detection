@@ -9,3 +9,9 @@
 
 # Ignore output plots
 **/plots/
+
+# Ignore saved numpys
+**/saved_npy/
+
+# Ignore csv files
+**/*.csv

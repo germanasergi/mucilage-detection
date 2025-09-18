@@ -10,7 +10,8 @@ ENDPOINTS:
   bucket_name: "eodata"
 
 MODEL:
-  model_name: "CNN"
+  model_name: "resnet18"
+  num_classes: 2
   log_features: False
 
 

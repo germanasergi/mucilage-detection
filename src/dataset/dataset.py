@@ -71,7 +71,7 @@ class Sentinel2PatchDataset(Dataset):
 
 
 class Sentinel2NumpyDataset(Dataset):
-    def __init__(self, df, bands, patch_size=256, target_res="r60m", transform=None, cache_file=None):
+    def __init__(self, df, bands, patch_size=256, target_res="r10m", transform=None, cache_file=None):
         """
         Args:
             df (pd.DataFrame): containing [zarr_path, x, y, label].
@@ -106,7 +106,7 @@ class Sentinel2NumpyDataset(Dataset):
 
         for zarr_path, group in tqdm(self.df.groupby("zarr_path"), desc="Building NumPy dataset"):
             ds = xr.open_datatree(zarr_path, engine="zarr", mask_and_scale=False, chunks={})
-            stack = build_stack(ds, self.bands,  target_res=self.target_res, ref_band="b01")  # (H, W, C)
+            stack = build_stack(ds, self.bands,  target_res=self.target_res, ref_band="b04")  # (H, W, C)
 
             for _, row in group.iterrows():
                 x, y, label = row["x"], row["y"], row["label"]
