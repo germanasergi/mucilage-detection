@@ -27,7 +27,7 @@ def plot_curve(df):
     plt.title("Training vs Validation Accuracy")
     plt.legend()
     plt.grid(True)
-    plt.savefig("plots/resnet/accuracy_loss_curve.png")
+    plt.savefig("accuracy_loss_curve.png")
 
     plt.tight_layout()
     plt.show()
@@ -61,17 +61,17 @@ def plot_false_positives(test_numpy, results, save_dir="plots", ncols=5):
         ax.axis("off")
 
     plt.tight_layout()
-    plt.savefig(os.path.join(save_dir, "resnet/false_positives.png"))
+    plt.savefig(os.path.join(save_dir, "false_positives.png"))
     plt.show()
 
 
 def main():
     dir_path = os.getcwd()
-    df = pd.read_csv(os.path.join(dir_path,"training_metrics_resnet.csv"))
+    df = pd.read_csv(os.path.join(dir_path,"training_metrics_eff.csv"))
     test_numpy = np.load(os.path.join(dir_path,"saved_npy/test_cache.npz"), allow_pickle=True)['X']
-    results = pd.read_csv(os.path.join(dir_path,"src/test_predictions.csv"))
+    results = pd.read_csv(os.path.join(dir_path,"test_predictions_eff.csv"))
 
-    #plot_curve(df)
+    plot_curve(df)
     plot_false_positives(test_numpy, results)
 
 if __name__ == "__main__":

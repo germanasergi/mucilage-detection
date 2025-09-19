@@ -54,3 +54,10 @@ python src/generate_dataset/download_S2_dataset.py --config /mucilage-detection/
 ```bash
 python src/dataset/patches.py
 ```
+
+## Classification
+
+Perform classification of the patches using the model configuration defined in config.yaml
+```bash
+python src/main.py --patch_csv /path/to/patch/csv
+```

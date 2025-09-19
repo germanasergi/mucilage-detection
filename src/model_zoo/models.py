@@ -252,7 +252,7 @@ def build_timm_model(model_name: str, in_channels: int, num_classes: int, pretra
     """
     logger.info(f"Building timm model {model_name} | in_channels={in_channels}, num_classes={num_classes}")
     
-    model = timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes, in_chans=in_channels)
+    model = timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes, in_chans=in_channels) #, img_size=256
 
     # If in_channels != 3, timm automatically adjusts the first conv
     # but you could also manually modify it if needed:

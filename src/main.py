@@ -1,6 +1,5 @@
 import os
-from datetime import datetime
-import matplotlib.pyplot as plt
+import argparse
 import pandas as pd
 import numpy as np
 import torch
@@ -206,6 +205,10 @@ def test_model(model, test_loader, criterion, device):
 
 def main():
 
+    parser = argparse.ArgumentParser(description='Download Sentinel data based on provided config and CSV files')
+    parser.add_argument('--patch_csv', type=str, required=True, help='Path to the patch CSV file')
+    args = parser.parse_args()
+    
     SRC_DIR = os.path.dirname(os.path.abspath(__file__))
     BASE_DIR = os.path.dirname(SRC_DIR)
 
@@ -222,7 +225,7 @@ def main():
     pat = config['TRAINING']['patience']
 
     # Data 
-    df = os.path.join(CSV_DIR, "patches_final.csv")  # top-left corners of patches + labels (optional)
+    df = args.patch_csv  # top-left corners of patches + labels (optional)
     df_train, df_val, df_test = split_data(df)
     train_loader, val_loader, test_loader = prepare_data(df_train, df_val, df_test, bands, batch_size, res=res)
 
@@ -268,14 +271,14 @@ def main():
 
     # # Save metrics to CSV
     df_hist = pd.DataFrame(history)
-    df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_allbands.csv"), index=False)
+    df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_eff.csv"), index=False)
 
     # Final test evaluation
     if "label" in df_test.columns:
         test_loss, test_acc, results = test_model(model, test_loader, criterion, device)
         print(f"Test loss: {test_loss:.4f}, Test acc: {test_acc:.3f}")
 
-        results.to_csv(os.path.join(SRC_DIR, "test_predictions.csv"), index=False)
+        results.to_csv(os.path.join(SRC_DIR, "test_predictions_eff.csv"), index=False)
     else:
         print("No labels in test set → skipping evaluation.")
 
