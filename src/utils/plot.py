@@ -1,7 +1,11 @@
 import os
 import pandas as pd
+import numpy as np
+from requests import patch
+import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
+import torch.nn.functional as F
 
 
 def plot_metrics(
@@ -222,3 +226,50 @@ def plot_all_chunks(data_tree, band, res, chunk_size_y, chunk_size_x, nb_chunks_
     if verbose:
         plt.tight_layout()
         plt.savefig("chunks_plot.png", dpi=300)
+
+def get_rgb(patch):
+    """
+    Convert multi-band patch to RGB for visualization.
+    bands: tuple with indices for (R, G, B).
+    """
+    rgb = patch[:, :, [3, 2, 1]] #now there is b1 as well
+    p2, p98 = np.nanpercentile(rgb, (2, 98))
+    rgb = np.clip((rgb - p2) / (p98 - p2 + 1e-6), 0, 1)
+    
+    return rgb
+
+
+def visualize_attention(attn_map, patch_img, upsample_size=256):
+    """
+    Show RGB patch and its attention map side by side.
+
+    attn_map: [H, W] attention map (torch.Tensor or np.ndarray)
+    patch_img: [H0, W0, C] original patch (numpy or tensor)
+    """
+    # --- Normalize attention ---
+    attn_map = attn_map.detach().cpu().numpy() if torch.is_tensor(attn_map) else attn_map
+    attn_map = (attn_map - attn_map.min()) / (attn_map.max() - attn_map.min() + 1e-8)
+
+    # --- Upsample to patch size ---
+    attn_tensor = torch.tensor(attn_map).unsqueeze(0).unsqueeze(0)  # [1,1,H,W]
+    attn_up = F.interpolate(attn_tensor, size=(upsample_size, upsample_size),
+                            mode="bilinear", align_corners=False)
+    attn_up = attn_up.squeeze().numpy()
+
+    # --- Get RGB composite ---
+    rgb = get_rgb(patch_img)  # your helper function (e.g. bands [b04,b03,b02])
+
+    # --- Plot side by side ---
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+    axes[0].imshow(rgb)
+    axes[0].set_title("RGB Patch")
+    axes[0].axis("off")
+
+    im = axes[1].imshow(attn_up, cmap="jet")
+    axes[1].set_title("Attention Map")
+    axes[1].axis("off")
+    fig.colorbar(im, ax=axes[1], fraction=0.046, pad=0.04, label="Attention weight")
+
+    plt.tight_layout()
+    plt.show()

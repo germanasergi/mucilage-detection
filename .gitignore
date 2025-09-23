@@ -13,5 +13,8 @@
 # Ignore saved numpys
 **/saved_npy/
 
+# Ignore attention maps
+**/attn_maps/
+
 # Ignore csv files
 **/*.csv

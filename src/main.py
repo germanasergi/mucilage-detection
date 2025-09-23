@@ -2,6 +2,7 @@ import os
 import argparse
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,10 +14,15 @@ from sklearn.model_selection import train_test_split
 from utils.utils import load_config
 from dataset.dataset import Sentinel2PatchDataset, Sentinel2NumpyDataset
 from dataset.loader import define_loaders
-from model_zoo.models import define_model, CNN, build_timm_model
+from model_zoo.models import CNN, MILResNet, build_timm_model
 from torch.utils.data import DataLoader
 from training.optim import EarlyStopping
+from utils.plot import visualize_attention
 #from training.metrics import MultiSpectralMetrics, avg_metric_bands
+
+# Code carbon
+from codecarbon import track_emissions
+
 
 def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
     df = pd.read_csv(labels_file)
@@ -52,28 +58,49 @@ def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=4,
     return train_loader, val_loader, test_loader
 
 
-def build_model(config, num_classes):
-    """
-    Build a classification model (CNN or timm model).
-    """
-    in_channels = len(config['DATASET']['bands'])
+# def build_model(config, num_classes):
+#     """
+#     Build a classification model (CNN or timm model).
+#     """
+#     in_channels = len(config['DATASET']['bands'])
 
-    if config['MODEL']['model_name'] == "CNN":
-        logger.info(f"Using CNN with in_channels={in_channels}, num_classes={num_classes}")
-        model = CNN(
-            num_classes=num_classes,
+#     if config['MODEL']['model_name'] == "CNN":
+#         logger.info(f"Using CNN with in_channels={in_channels}, num_classes={num_classes}")
+#         model = CNN(
+#             num_classes=num_classes,
+#             in_channels=in_channels,
+#             log_features=config['MODEL'].get('log_features', False)
+#         )
+#     else:
+#         # Assume the model_name matches a timm architecture
+#         model_name = config['MODEL']['model_name']
+#         pretrained = config['MODEL'].get('pretrained', True)
+#         model = build_timm_model(model_name, in_channels, num_classes, pretrained=pretrained)
+
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     model = model.to(device)
+#     return model, device
+
+def build_model(config, num_classes):
+    in_channels = len(config['DATASET']['bands'])
+    model_name = config['MODEL']['model_name']
+
+    if model_name.startswith("MIL_"):
+        base_name = model_name.replace("MIL_", "")
+        logger.info(f"Using MIL model with backbone={base_name}, in_channels={in_channels}, num_classes={num_classes}")
+        model = MILResNet(
+            model_name=base_name,
             in_channels=in_channels,
-            log_features=config['MODEL'].get('log_features', False)
+            num_classes=num_classes,
+            pretrained=config['MODEL'].get('pretrained', True)
         )
     else:
-        # Assume the model_name matches a timm architecture
-        model_name = config['MODEL']['model_name']
+        logger.info(f"Using timm model {model_name} | in_channels={in_channels}, num_classes={num_classes}")
         pretrained = config['MODEL'].get('pretrained', True)
         model = build_timm_model(model_name, in_channels, num_classes, pretrained=pretrained)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-    return model, device
+    return model.to(device), device
 
 
 def build_opt(model, config, y=None, device="cpu"):
@@ -131,7 +158,7 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device):
         inputs, labels = inputs.to(device), labels.to(device)
 
         optimizer.zero_grad()
-        outputs = model(inputs)
+        outputs, _ = model(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -145,6 +172,7 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device):
     epoch_acc = correct / total
     return epoch_loss, epoch_acc
 
+
 def evaluate_model(model, val_loader, criterion, device):
     model.eval()
     running_loss = 0.0
@@ -154,7 +182,7 @@ def evaluate_model(model, val_loader, criterion, device):
     with torch.no_grad():
         for inputs, labels in tqdm(val_loader, desc="Validation", leave=False):
             inputs, labels = inputs.to(device), labels.to(device)
-            outputs = model(inputs)
+            outputs, _ = model(inputs)
             loss = criterion(outputs, labels)
 
             running_loss += loss.item() * inputs.size(0)
@@ -166,30 +194,89 @@ def evaluate_model(model, val_loader, criterion, device):
     epoch_acc = correct / total
     return epoch_loss, epoch_acc
 
-def test_model(model, test_loader, criterion, device):
+
+# def test_model(model, test_loader, criterion, device):
+#     model.eval()
+#     running_loss = 0.0
+#     correct = 0
+#     total = 0
+#     y_true, y_prob, y_pred = [], [], []
+
+#     with torch.no_grad():
+#         for inputs, labels in tqdm(test_loader, desc="Testing", leave=False):
+#             inputs, labels = inputs.to(device), labels.to(device)
+#             outputs = model(inputs)
+#             loss = criterion(outputs, labels)
+
+#             running_loss += loss.item() * inputs.size(0)
+#             _, predicted = torch.max(outputs, 1)
+#             total += labels.size(0)
+#             correct += (predicted == labels).sum().item()
+
+#             probs = torch.softmax(outputs, dim=1)[:, 1]  # prob mucilage class
+#             preds = (probs >= 0.7).long()
+
+#             y_true.extend(labels.cpu().numpy())
+#             y_prob.extend(probs.cpu().numpy())
+#             y_pred.extend(preds.cpu().numpy())
+
+#     epoch_loss = running_loss / total
+#     epoch_acc = correct / total
+
+#     results = pd.DataFrame({
+#         "y_true": y_true,
+#         "y_pred": y_pred,
+#         "y_prob": y_prob
+#     })
+
+#     return epoch_loss, epoch_acc, results
+
+def test_model(model, test_loader, criterion, device, save_attn_dir=None, attn_threshold=None):
     model.eval()
     running_loss = 0.0
     correct = 0
     total = 0
     y_true, y_prob, y_pred = [], [], []
 
+    if save_attn_dir:
+        os.makedirs(save_attn_dir, exist_ok=True)
+
     with torch.no_grad():
-        for inputs, labels in tqdm(test_loader, desc="Testing", leave=False):
+        for batch_idx, (inputs, labels) in enumerate(tqdm(test_loader, desc="Testing", leave=False)):
             inputs, labels = inputs.to(device), labels.to(device)
+
+            # --- Handle models with attention maps ---
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            if isinstance(outputs, tuple):
+                logits, attn_maps = outputs
+            else:
+                logits, attn_maps = outputs, None
+
+            loss = criterion(logits, labels)
 
             running_loss += loss.item() * inputs.size(0)
-            _, predicted = torch.max(outputs, 1)
+            _, predicted = torch.max(logits, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-            probs = torch.softmax(outputs, dim=1)[:, 1]  # prob mucilage class
+            probs = torch.softmax(logits, dim=1)[:, 1]  # prob mucilage class
             preds = (probs >= 0.7).long()
 
             y_true.extend(labels.cpu().numpy())
             y_prob.extend(probs.cpu().numpy())
             y_pred.extend(preds.cpu().numpy())
+
+            # --- Save attention maps if requested ---
+            if attn_maps is not None and save_attn_dir:
+                for i in range(len(inputs)):
+                    attn = attn_maps[i].cpu().numpy()
+                    np.save(os.path.join(save_attn_dir, f"sample{batch_idx}_{i}_attn.npy"), attn)
+
+                    # save overlay visualization
+                    patch_img = inputs[i].permute(1,2,0).cpu().numpy()
+                    visualize_attention(attn_maps[i], patch_img, upsample_size=inputs.shape[-1])
+                    plt.savefig(os.path.join(save_attn_dir, f"sample{batch_idx}_{i}_overlay.png"))
+                    plt.close()
 
     epoch_loss = running_loss / total
     epoch_acc = correct / total
@@ -205,7 +292,7 @@ def test_model(model, test_loader, criterion, device):
 
 def main():
 
-    parser = argparse.ArgumentParser(description='Download Sentinel data based on provided config and CSV files')
+    parser = argparse.ArgumentParser(description='Classify Sentinel-2 patches')
     parser.add_argument('--patch_csv', type=str, required=True, help='Path to the patch CSV file')
     args = parser.parse_args()
     
@@ -275,7 +362,7 @@ def main():
 
     # Final test evaluation
     if "label" in df_test.columns:
-        test_loss, test_acc, results = test_model(model, test_loader, criterion, device)
+        test_loss, test_acc, results = test_model(model, test_loader, criterion, device, save_attn_dir=os.path.join(SRC_DIR,"attn_maps"), attn_threshold=0.7)
         print(f"Test loss: {test_loss:.4f}, Test acc: {test_acc:.3f}")
 
         results.to_csv(os.path.join(SRC_DIR, "test_predictions_eff.csv"), index=False)
