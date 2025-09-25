@@ -14,10 +14,10 @@ from sklearn.model_selection import train_test_split
 from utils.utils import load_config
 from dataset.dataset import Sentinel2PatchDataset, Sentinel2NumpyDataset
 from dataset.loader import define_loaders
-from model_zoo.models import CNN, MILResNet, build_timm_model
+from model_zoo.models import CNN, MILResNet, MILResNetMultiHead, build_timm_model
 from torch.utils.data import DataLoader
 from training.optim import EarlyStopping
-from utils.plot import visualize_attention
+from utils.plot import save_attention, save_multi_attention
 #from training.metrics import MultiSpectralMetrics, avg_metric_bands
 
 # Code carbon
@@ -57,43 +57,53 @@ def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=4,
 
     return train_loader, val_loader, test_loader
 
+def diversity_loss(attn_maps):
+    # attn_maps: [B, H, W]
+    if isinstance(attn_maps, list):
+        attn_maps = torch.stack(attn_maps, dim=0)
+    B, Hn, H, W = attn_maps.shape
+    attn_maps = attn_maps.view(B, Hn, -1)  # [B, num_heads, N]
+    # Flatten
+    attn_maps = attn_maps / (attn_maps.sum(dim=2, keepdim=True) + 1e-8)
+    # Compute pairwise similarity between heads
+    sims = []
+    for i in range(Hn):
+        for j in range(i + 1, Hn):
+            sim = torch.sum(attn_maps[:, i, :] * attn_maps[:, j, :], dim=1)  # [B]
+            sims.append(sim.mean())
 
-# def build_model(config, num_classes):
-#     """
-#     Build a classification model (CNN or timm model).
-#     """
-#     in_channels = len(config['DATASET']['bands'])
+    if len(sims) == 0:
+        return torch.tensor(0.0, device=attn_maps.device)
 
-#     if config['MODEL']['model_name'] == "CNN":
-#         logger.info(f"Using CNN with in_channels={in_channels}, num_classes={num_classes}")
-#         model = CNN(
-#             num_classes=num_classes,
-#             in_channels=in_channels,
-#             log_features=config['MODEL'].get('log_features', False)
-#         )
-#     else:
-#         # Assume the model_name matches a timm architecture
-#         model_name = config['MODEL']['model_name']
-#         pretrained = config['MODEL'].get('pretrained', True)
-#         model = build_timm_model(model_name, in_channels, num_classes, pretrained=pretrained)
+    return torch.stack(sims).mean()
 
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#     model = model.to(device)
-#     return model, device
+
 
 def build_model(config, num_classes):
+    """
+    Build a classification model (CNN or timm model).
+    """
     in_channels = len(config['DATASET']['bands'])
     model_name = config['MODEL']['model_name']
 
     if model_name.startswith("MIL_"):
         base_name = model_name.replace("MIL_", "")
         logger.info(f"Using MIL model with backbone={base_name}, in_channels={in_channels}, num_classes={num_classes}")
-        model = MILResNet(
+        model = MILResNetMultiHead(
             model_name=base_name,
             in_channels=in_channels,
             num_classes=num_classes,
             pretrained=config['MODEL'].get('pretrained', True)
         )
+
+    elif config['MODEL']['model_name'] == "CNN":
+        logger.info(f"Using CNN with in_channels={in_channels}, num_classes={num_classes}")
+        model = CNN(
+            num_classes=num_classes,
+            in_channels=in_channels,
+            log_features=config['MODEL'].get('log_features', False)
+        )
+
     else:
         logger.info(f"Using timm model {model_name} | in_channels={in_channels}, num_classes={num_classes}")
         pretrained = config['MODEL'].get('pretrained', True)
@@ -147,7 +157,7 @@ def build_opt(model, config, y=None, device="cpu"):
 
     return optimizer, criterion, scheduler_class
 
-
+@track_emissions(save_to_api=True, experiment_id="91ba3396-1ad3-40a0-b64f-df074b7af5a7")
 def train_one_epoch(model, dataloader, optimizer, criterion, device):
     model.train()
     running_loss = 0.0
@@ -158,8 +168,12 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device):
         inputs, labels = inputs.to(device), labels.to(device)
 
         optimizer.zero_grad()
-        outputs, _ = model(inputs)
-        loss = criterion(outputs, labels)
+        # outputs = model(inputs)
+        # loss = criterion(outputs, labels)
+        # ADDED FOR MULTIHEAD
+        outputs, attn_maps = model(inputs)
+        ce_loss = criterion(outputs, labels)
+        loss = ce_loss + 0.05 * diversity_loss(attn_maps)
         loss.backward()
         optimizer.step()
 
@@ -173,6 +187,7 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device):
     return epoch_loss, epoch_acc
 
 
+@track_emissions(save_to_api=True, experiment_id="91ba3396-1ad3-40a0-b64f-df074b7af5a7")
 def evaluate_model(model, val_loader, criterion, device):
     model.eval()
     running_loss = 0.0
@@ -231,6 +246,7 @@ def evaluate_model(model, val_loader, criterion, device):
 
 #     return epoch_loss, epoch_acc, results
 
+@track_emissions(save_to_api=True, experiment_id="91ba3396-1ad3-40a0-b64f-df074b7af5a7")
 def test_model(model, test_loader, criterion, device, save_attn_dir=None, attn_threshold=None):
     model.eval()
     running_loss = 0.0
@@ -268,15 +284,13 @@ def test_model(model, test_loader, criterion, device, save_attn_dir=None, attn_t
 
             # --- Save attention maps if requested ---
             if attn_maps is not None and save_attn_dir:
-                for i in range(len(inputs)):
-                    attn = attn_maps[i].cpu().numpy()
-                    np.save(os.path.join(save_attn_dir, f"sample{batch_idx}_{i}_attn.npy"), attn)
+                for b in range(inputs.size(0)):
+                    if preds[b].item() == 1:  # only save mucilage predictions
+                        patch_img = inputs[b].permute(1,2,0).cpu().numpy()
+                        save_path = os.path.join(save_attn_dir, f"sample_{batch_idx}_{b}.png")
+                        per_sample_maps = [head[b] for head in attn_maps]
+                        save_multi_attention(per_sample_maps, patch_img, save_path=save_path)
 
-                    # save overlay visualization
-                    patch_img = inputs[i].permute(1,2,0).cpu().numpy()
-                    visualize_attention(attn_maps[i], patch_img, upsample_size=inputs.shape[-1])
-                    plt.savefig(os.path.join(save_attn_dir, f"sample{batch_idx}_{i}_overlay.png"))
-                    plt.close()
 
     epoch_loss = running_loss / total
     epoch_acc = correct / total
@@ -358,14 +372,14 @@ def main():
 
     # # Save metrics to CSV
     df_hist = pd.DataFrame(history)
-    df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_eff.csv"), index=False)
+    df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_res_60.csv"), index=False)
 
     # Final test evaluation
     if "label" in df_test.columns:
-        test_loss, test_acc, results = test_model(model, test_loader, criterion, device, save_attn_dir=os.path.join(SRC_DIR,"attn_maps"), attn_threshold=0.7)
+        test_loss, test_acc, results = test_model(model, test_loader, criterion, device, save_attn_dir=os.path.join(SRC_DIR,"multi_attn_maps_bin"), attn_threshold=0.7)
         print(f"Test loss: {test_loss:.4f}, Test acc: {test_acc:.3f}")
 
-        results.to_csv(os.path.join(SRC_DIR, "test_predictions_eff.csv"), index=False)
+        results.to_csv(os.path.join(SRC_DIR, "test_predictions_res_60.csv"), index=False)
     else:
         print("No labels in test set → skipping evaluation.")
 

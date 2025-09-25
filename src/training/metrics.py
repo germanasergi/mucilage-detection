@@ -67,9 +67,9 @@ def plot_false_positives(test_numpy, results, save_dir="plots", ncols=5):
 
 def main():
     dir_path = os.getcwd()
-    df = pd.read_csv(os.path.join(dir_path,"training_metrics_eff.csv"))
+    df = pd.read_csv(os.path.join(dir_path,"training_metrics_res_60.csv"))
     test_numpy = np.load(os.path.join(dir_path,"saved_npy/test_cache.npz"), allow_pickle=True)['X']
-    results = pd.read_csv(os.path.join(dir_path,"test_predictions_eff.csv"))
+    results = pd.read_csv(os.path.join(dir_path,"test_predictions_res_60.csv"))
 
     plot_curve(df)
     plot_false_positives(test_numpy, results)

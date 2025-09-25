@@ -120,7 +120,7 @@ class MILResNet(nn.Module):
             pretrained=pretrained,
             num_classes=0,   # no FC classifier
             in_chans=in_channels,
-            global_pool=""  # keep spatial feature maps
+            global_pool=""  # keep spatial feature maps - no global pooling
         )
         feat_dim = self.backbone.num_features  # e.g. 512 for resnet18
 
@@ -153,6 +153,51 @@ class MILResNet(nn.Module):
         logits = self.classifier(bag_repr)  # [B, num_classes]
 
         return logits, attn.view(B, H, W)
+    
+
+class MILResNetMultiHead(nn.Module):
+    def __init__(self, model_name="resnet18", in_channels=7, num_classes=2, pretrained=True, num_heads=4):
+        super().__init__()
+        self.backbone = timm.create_model(
+            model_name,
+            pretrained=pretrained,
+            num_classes=0,
+            in_chans=in_channels,
+            global_pool=""
+        )
+        feat_dim = self.backbone.num_features
+
+        # Multiple attention heads
+        self.attentions = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(feat_dim, 128),
+                nn.Tanh(),
+                nn.Linear(128, 1)
+            ) for _ in range(num_heads)
+        ])
+
+        # Classifier
+        self.classifier = nn.Linear(feat_dim * num_heads, num_classes)
+
+    def forward(self, x):
+        features = self.backbone.forward_features(x)   # [B, C, H, W]
+        B, C, H, W = features.shape
+        instances = features.view(B, C, H * W).permute(0, 2, 1)  # [B, N, C]
+
+        bag_reprs = []
+        attn_maps = []
+
+        for attn_net in self.attentions:
+            attn_logits = attn_net(instances)  # [B, N, 1]
+            attn = torch.softmax(attn_logits, dim=1)   # [B, N, 1]
+            bag_repr = torch.sum(attn * instances, dim=1)  # [B, C]
+            bag_reprs.append(bag_repr)
+            attn_maps.append(attn.view(B, H, W))  # store spatial map
+
+        bag_reprs = torch.cat(bag_reprs, dim=1)  # [B, C * num_heads]
+        logits = self.classifier(bag_reprs)
+
+        return logits, attn_maps
     
 
 def build_timm_model(model_name: str, in_channels: int, num_classes: int, pretrained=True):

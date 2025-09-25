@@ -239,7 +239,7 @@ def get_rgb(patch):
     return rgb
 
 
-def visualize_attention(attn_map, patch_img, upsample_size=256):
+def save_attention(attn_map, patch_img, upsample_size=256, save_path="attention.png"):
     """
     Show RGB patch and its attention map side by side.
 
@@ -272,4 +272,44 @@ def visualize_attention(attn_map, patch_img, upsample_size=256):
     fig.colorbar(im, ax=axes[1], fraction=0.046, pad=0.04, label="Attention weight")
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig(save_path, dpi=150)
+    plt.close()
+
+
+def save_multi_attention(attn_maps, patch_img, upsample_size=256, save_path="multi_attention.png", threshold=0.5):
+    rgb = get_rgb(patch_img)
+    num_heads = len(attn_maps)
+
+    # Create figure: RGB + each head + aggregated mask
+    fig, axes = plt.subplots(1, num_heads + 2, figsize=(4 * (num_heads + 2), 4))
+
+    # --- RGB image ---
+    axes[0].imshow(rgb)
+    axes[0].set_title("RGB")
+    axes[0].axis("off")
+
+    # --- Per-head attention maps ---
+    attn_list = []
+    for i, attn in enumerate(attn_maps):
+        attn = attn.detach().cpu().numpy()
+        attn = (attn - attn.min()) / (attn.max() - attn.min() + 1e-8)
+        attn_tensor = torch.tensor(attn).unsqueeze(0).unsqueeze(0)
+        attn_up = F.interpolate(attn_tensor, size=(upsample_size, upsample_size),
+                                mode="bilinear", align_corners=False)
+        attn_up = attn_up.squeeze().numpy()
+        attn_list.append(attn_up)
+
+        axes[i + 1].imshow(attn_up, cmap="jet")
+        axes[i + 1].set_title(f"Head {i+1}")
+        axes[i + 1].axis("off")
+
+    # --- Aggregated binary mask (mean across heads) ---
+    agg_map = np.max(np.stack(attn_list, axis=0), axis=0)
+    binary_mask = (agg_map >= threshold).astype(np.uint8)
+
+    axes[num_heads + 1].imshow(binary_mask, cmap="gray")
+    axes[num_heads + 1].set_title("Binary mask")
+    axes[num_heads + 1].axis("off")
+
+    plt.savefig(save_path, dpi=150)
+    plt.close()
