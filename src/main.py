@@ -376,7 +376,7 @@ def main():
 
     # Final test evaluation
     if "label" in df_test.columns:
-        test_loss, test_acc, results = test_model(model, test_loader, criterion, device, save_attn_dir=os.path.join(SRC_DIR,"multi_attn_maps_bin"), attn_threshold=0.7)
+        test_loss, test_acc, results = test_model(model, test_loader, criterion, device, save_attn_dir=os.path.join(SRC_DIR,"multi_attn_maps_bin_max"), attn_threshold=0.7)
         print(f"Test loss: {test_loss:.4f}, Test acc: {test_acc:.3f}")
 
         results.to_csv(os.path.join(SRC_DIR, "test_predictions_res_60.csv"), index=False)

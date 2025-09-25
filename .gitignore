@@ -17,6 +17,7 @@
 **/attn_maps/
 **/multi_attn_maps/
 **/multi_attn_maps_bin/
+**/multi_attn_maps_bin_max/
 
 # Ignore csv files
 *.csv
