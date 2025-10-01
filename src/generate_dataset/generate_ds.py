@@ -2,6 +2,7 @@ import os
 import time
 import yaml
 import shutil
+import sys
 from datetime import datetime, timedelta
 import pandas as pd
 import requests
@@ -13,7 +14,7 @@ from shapely.geometry import shape, Polygon
 load_dotenv()
 
 # Import modules
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.utils import remove_last_segment_rsplit
 from utils.cdse_utils import (create_cdse_query_url, download_bands)
 from auth.auth import S3Connector
@@ -273,3 +274,8 @@ def compute_coverage_ratio(geofootprint_str, bbox):
     if intersection.is_empty:
         return 0.0
     return intersection.area / aoi_polygon.area
+
+def remove_last_segment_rsplit(sentinel_id):
+    # Split from the right side, max 1 split
+    parts = sentinel_id.rsplit('_', 1)
+    return parts[0]

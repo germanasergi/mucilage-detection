@@ -55,7 +55,7 @@ def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=4,
     val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_loader  = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    return train_loader, val_loader, test_loader
+    return train_loader, val_loader, test_loader, mean, std
 
 def diversity_loss(attn_maps):
     # attn_maps: [B, H, W]
@@ -328,7 +328,7 @@ def main():
     # Data 
     df = args.patch_csv  # top-left corners of patches + labels (optional)
     df_train, df_val, df_test = split_data(df)
-    train_loader, val_loader, test_loader = prepare_data(df_train, df_val, df_test, bands, batch_size, res=res)
+    train_loader, val_loader, test_loader, mean, std = prepare_data(df_train, df_val, df_test, bands, batch_size, res=res)
 
     # Labels
     if "label" in df_train.columns:
@@ -371,15 +371,24 @@ def main():
 
 
     # # Save metrics to CSV
-    df_hist = pd.DataFrame(history)
-    df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_res_60.csv"), index=False)
+    # df_hist = pd.DataFrame(history)
+    # df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_res_60.csv"), index=False)
+
+    checkpoint_path = os.path.join(SRC_DIR, "training/mil_checkpoint.pth")
+    torch.save({
+        "model_state": model.state_dict(),
+        "mean": mean,
+        "std": std,
+        "config": config
+    }, checkpoint_path)
+    print(f"Checkpoint saved to {checkpoint_path}")
 
     # Final test evaluation
     if "label" in df_test.columns:
         test_loss, test_acc, results = test_model(model, test_loader, criterion, device, save_attn_dir=os.path.join(SRC_DIR,"multi_attn_maps_bin_max"), attn_threshold=0.7)
         print(f"Test loss: {test_loss:.4f}, Test acc: {test_acc:.3f}")
 
-        results.to_csv(os.path.join(SRC_DIR, "test_predictions_res_60.csv"), index=False)
+        # results.to_csv(os.path.join(SRC_DIR, "test_predictions_res_60.csv"), index=False)
     else:
         print("No labels in test set → skipping evaluation.")
 

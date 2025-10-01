@@ -2,6 +2,7 @@
 
 import os
 import yaml
+import sys
 import pandas as pd
 import boto3
 from loguru import logger
@@ -17,6 +18,7 @@ from datetime import datetime
 from sklearn.utils import shuffle
 
 # Import modules
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from auth.auth import S3Connector
 from utils.cdse_utils import (download_bands, extract_s3_path_from_url, create_rgb_image)
 
@@ -80,7 +82,6 @@ def prepare_paths(path_dir):
 
     logger.info(f"Paths prepared: {len(df_output)} output files")
     return df_output
-
 
 
 
