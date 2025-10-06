@@ -13,8 +13,9 @@ from dataset.patches import resample_band
 import yaml
 import timm
 
-def latlon_to_pixel(ds, lat, lon):
+def latlon_to_pixel(zarr_file, lat, lon):
     # Find CRS of the dataset
+    ds = xr.open_datatree(zarr_file, engine="zarr", mask_and_scale=False)
     crs = "EPSG:32632"
 
     # Transformer lat/lon → UTM
@@ -102,7 +103,7 @@ def get_rgb(patch):
 def run_inference(patch_file, model, device, mean, std, save_dir="inference_outputs"):
     os.makedirs(save_dir, exist_ok=True)
 
-    # --- Load patch (assume npy [H, W, C]) ---
+    # Load patch (assume npy [H, W, C])
     # patch = np.load(patch_file)  # e.g. shape [H, W, C]
     # patch = patch['X'][0]
     patch = preprocess_patch(patch_file, mean, std)
@@ -111,10 +112,10 @@ def run_inference(patch_file, model, device, mean, std, save_dir="inference_outp
         print("Patch contains NaN or Inf values. Skipping inference.")
         return
 
-    # --- Torch tensor ---
+    # Torch tensor
     inp = torch.tensor(patch, dtype=torch.float).permute(2, 0, 1).unsqueeze(0).to(device)  # [1, C, H, W]
 
-    # --- Forward pass ---
+    # Forward pass
     with torch.no_grad():
         logits, attn_maps = model(inp)
         probs = torch.softmax(logits, dim=1)[0, 1].item()
@@ -122,10 +123,10 @@ def run_inference(patch_file, model, device, mean, std, save_dir="inference_outp
 
     print(f"Prediction: {pred} | Prob(mucilage)={probs:.3f}")
 
-    # --- Save attention maps ---
+    # Save attention maps
     if pred == 1:  # only for mucilage
         patch_img = patch  # already normalized → convert back to RGB for display
-        save_path = os.path.join(save_dir, "attention.png")
+        save_path = os.path.join(save_dir, "attention_tuj.png")
         per_sample_maps = [head[0] for head in attn_maps]  # extract from batch
         save_multi_attention(per_sample_maps, patch_img, save_path=save_path)
         print(f"Saved attention maps → {save_path}")
@@ -136,29 +137,30 @@ if __name__ == "__main__":
     #parser.add_argument("--patch_file", type=str, required=True, help="Path to input .npy patch file [H,W,C]")
     parser.add_argument("--zarr_file", type=str, default="/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_inference/target/S2A_MSIL2A_20250809T100041_N0511_R122_T32TQQ_20250809T122414.zarr", help="Path to input .zarr file")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to trained model .pth")
+    parser.add_argument("--lat", type=float, default=44, help="Latitude of patch center")
+    parser.add_argument("--lon", type=float, default=13, help="Longitude of patch center")
     args = parser.parse_args()
 
     # Crop patch
     bands = ['b01','b02', 'b03', 'b04', 'b05', 'b06', 'b07','b08','b8a', 'b11', 'b12']
-    yc, xc = latlon_to_pixel(xr.open_datatree(args.zarr_file, engine="zarr", mask_and_scale=False), lat=44.81, lon=12.62)
+    yc, xc = latlon_to_pixel(args.zarr_file, lat=args.lat, lon=args.lon)
     patch, (y0, x0) = centered_patch_from_zarr(args.zarr_file, yc=yc, xc=xc, patch_size=256, bands=bands)
 
-
-    # --- Device ---
+    # Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load model checkpoints
     ckpt = torch.load(args.checkpoint, map_location=device, weights_only=False)
 
-    # --- Load config ---
+    # Load config
     config = ckpt['config']
     
-    # --- Load model ---
+    # Load model
     model = load_model(config, ckpt, device)
 
-    # --- Run inference ---
+    # Run inference
     run_inference(patch, model, device, ckpt['mean'], ckpt['std'])
 
     # Save RGB for reference
     rgb = get_rgb(patch)
-    plt.imsave(os.path.join("inference_outputs", "input_rgb_2.png"), rgb)
+    plt.imsave(os.path.join("inference_outputs", "input_rgb_tuj_1_test.png"), rgb)
