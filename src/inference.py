@@ -63,7 +63,6 @@ def load_config(cfg_path):
     with open(cfg_path, "r") as f:
         return yaml.safe_load(f)
 
-
 def load_model(config, ckpt, device):
     in_channels = len(config['DATASET']['bands'])
     base_name = config['MODEL']['model_name'].replace("MIL_", "")

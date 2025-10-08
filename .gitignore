@@ -9,6 +9,8 @@
 
 # Ignore output plots
 **/plots/
+**/roboflow_dataset/
+**/rgb_patches/
 
 # Ignore saved numpys
 **/saved_npy/

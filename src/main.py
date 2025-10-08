@@ -39,9 +39,9 @@ def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
 
 
 def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=4, res="r10m"):
-    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache.npz")
-    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz")
-    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz")
+    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache.npz", masks="saved_npy/train_masks_refined.npz", task="segmentation")
+    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz", masks="saved_npy/val_masks_refined.npz", task="segmentation")
+    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz", masks="saved_npy/test_masks_refined.npz", task="segmentation")
 
     # Normalize
     mean = np.nanmean(train_ds.X, axis=(0,1,2))
