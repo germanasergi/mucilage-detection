@@ -10,10 +10,16 @@ ENDPOINTS:
   bucket_name: "eodata"
 
 MODEL:
-  model_name: "MIL_resnet18"
+  # model_name: "MIL_resnet18"
+  # num_classes: 2
+  # pretrained: True
+  # log_features: False
+  model_name: "Unet"
+  encoder_name: "timm-efficientnet-b2"
+  encoder_weights: "imagenet"
+  in_channel: 11
   num_classes: 2
-  pretrained: True
-  log_features: False
+  activation: None
 
 
 TRAINING:

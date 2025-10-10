@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 
 from utils.utils import load_config
 from dataset.dataset import Sentinel2PatchDataset, Sentinel2NumpyDataset
-from dataset.loader import define_loaders
+from dataset.loader import define_loaders, define_model
 from model_zoo.models import CNN, MILResNet, MILResNetMultiHead, build_timm_model
 from torch.utils.data import DataLoader
 from training.optim import EarlyStopping
@@ -39,9 +39,9 @@ def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
 
 
 def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=4, res="r10m"):
-    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache.npz", masks="saved_npy/train_masks_refined.npz", task="segmentation")
-    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz", masks="saved_npy/val_masks_refined.npz", task="segmentation")
-    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz", masks="saved_npy/test_masks_refined.npz", task="segmentation")
+    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache.npz")
+    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz")
+    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz")
 
     # Normalize
     mean = np.nanmean(train_ds.X, axis=(0,1,2))
@@ -111,6 +111,7 @@ def build_model(config, num_classes):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return model.to(device), device
+
 
 
 def build_opt(model, config, y=None, device="cpu"):
@@ -339,7 +340,7 @@ def main():
         num_classes = config['MODEL'].get('num_classes', 2)  # fallback for inference
 
     # Model, optimizer, criterion
-    model, device = build_model(config, num_classes=num_classes)
+    model, device = build_model(config) # num_classes=num_classes
     optimizer, criterion, scheduler = build_opt(model, config, y=y_train, device=device)
 
     # Training loop
