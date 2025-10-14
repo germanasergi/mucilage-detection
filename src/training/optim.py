@@ -1,5 +1,7 @@
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR  # or another scheduler
+import torch.nn.functional as F
+import torch
 
 # Adam optimizer with weight decay
 """
@@ -39,6 +41,21 @@ scheduler = optim.lr_scheduler.CosineAnnealingLR(
     eta_min=1e-6  # minimum learning rate
 )
 """
+
+def dice_loss_multiclass(logits, targets, eps=1e-6):
+    probs = torch.softmax(logits, dim=1)
+    # Only compute Dice on mucilage class (class 1)
+    probs_fg = probs[:, 1, :, :]
+    targets_fg = (targets == 1).float()
+    intersection = (probs_fg * targets_fg).sum(dim=(1,2))
+    union = probs_fg.sum(dim=(1,2)) + targets_fg.sum(dim=(1,2))
+    dice = (2. * intersection + eps) / (union + eps)
+    return 1 - dice.mean()
+
+def combined_ce_dice_loss(logits, targets, ce_weight=0.5, class_weights=None):
+    ce = F.cross_entropy(logits, targets.long(), weight=class_weights)
+    dice = dice_loss_multiclass(logits, targets)
+    return ce_weight * ce + (1 - ce_weight) * dice
 
 
 class EarlyStopping:

@@ -3,6 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import math
 import numpy as np
+from sklearn.metrics import auc, roc_auc_score, roc_curve, precision_recall_curve
 
 
 def plot_curve(df):
@@ -31,6 +32,8 @@ def plot_curve(df):
 
     plt.tight_layout()
     plt.show()
+
+
 
 def plot_false_positives(test_numpy, results, save_dir="plots", ncols=5):
     os.makedirs(save_dir, exist_ok=True)
@@ -64,15 +67,41 @@ def plot_false_positives(test_numpy, results, save_dir="plots", ncols=5):
     plt.savefig(os.path.join(save_dir, "false_positives.png"))
     plt.show()
 
+def plot_auc(results):
+    y_true = results["y_true"].values
+    y_score = results["y_prob"].values
+
+    fpr, tpr, roc_thresholds = roc_curve(y_true, y_score)
+    auc_value = roc_auc_score(y_true, y_score)
+
+    precision, recall, thresholds = precision_recall_curve(y_true, y_score)
+    pr_auc = auc(recall, precision)
+    print(f"Precision-Recall AUC: {pr_auc:.4f}")
+
+    plt.figure()
+    plt.plot(fpr, tpr, label=f"U-net (AUC={auc_value:.3f})")
+    plt.plot([0,1], [0,1], linestyle="--", color="gray")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curve - U-net")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+    plt.savefig("roc_curve.png", dpi=300)
+    plt.close()
+
+    print(f"ROC AUC: {auc_value:.3f}")
+
 
 def main():
     dir_path = os.getcwd()
-    df = pd.read_csv(os.path.join(dir_path,"training_metrics_res_60.csv"))
+    df = pd.read_csv(os.path.join(dir_path,"training_metrics_unet.csv"))
     test_numpy = np.load(os.path.join(dir_path,"saved_npy/test_cache.npz"), allow_pickle=True)['X']
-    results = pd.read_csv(os.path.join(dir_path,"test_predictions_res_60.csv"))
+    results = pd.read_csv(os.path.join(dir_path,"test_predictions_unet.csv"))
 
     plot_curve(df)
-    plot_false_positives(test_numpy, results)
+    #plot_false_positives(test_numpy, results)
+    plot_auc(results)
 
 if __name__ == "__main__":
     main()

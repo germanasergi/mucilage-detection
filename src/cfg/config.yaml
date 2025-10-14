@@ -15,7 +15,7 @@ MODEL:
   # pretrained: True
   # log_features: False
   model_name: "Unet"
-  encoder_name: "timm-efficientnet-b2"
+  encoder_name: "resnet34"
   encoder_weights: "imagenet"
   in_channel: 11
   num_classes: 2
@@ -30,4 +30,4 @@ TRAINING:
   scheduler_type: "ReduceLROnPlateau"
   factor: 0.5
   patience: 5
-  num_epochs: 30
+  num_epochs: 20

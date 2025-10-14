@@ -58,13 +58,11 @@ def define_model(
     in_channel=3,
     encoder_weights=None,
     activation=None,
-
 ):
     # Get the model class dynamically based on name
     try:
         # Get the model class from segmentation_models_pytorch
         ModelClass = getattr(smp, name)
-
 
         # Create the model
         model = ModelClass(
@@ -73,7 +71,6 @@ def define_model(
             in_channels=in_channel,
             classes=out_channels,
             activation=None,
-
         )
 
         # Add ReLU activation after the model

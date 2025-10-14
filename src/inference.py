@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from model_zoo.models import CNN, MILResNet, MILResNetMultiHead, build_timm_model
 from utils.plot import save_attention, save_multi_attention, get_rgb
 from dataset.patches import resample_band
+from dataset.loader import define_model
 import yaml
 import timm
 
@@ -65,14 +66,22 @@ def load_config(cfg_path):
 
 def load_model(config, ckpt, device):
     in_channels = len(config['DATASET']['bands'])
-    base_name = config['MODEL']['model_name'].replace("MIL_", "")
-    model = MILResNetMultiHead(
-        model_name=base_name,
-        in_channels=in_channels,
-        num_classes=config['MODEL'].get('num_classes', 2),
-        pretrained=False,  # no need for pretrained during inference
-        num_heads=config['MODEL'].get('num_heads', 4)
-    )
+    # base_name = config['MODEL']['model_name'].replace("MIL_", "")
+    # model = MILResNetMultiHead(
+    #     model_name=base_name,
+    #     in_channels=in_channels,
+    #     num_classes=config['MODEL'].get('num_classes', 2),
+    #     pretrained=False,  # no need for pretrained during inference
+    #     num_heads=config['MODEL'].get('num_heads', 4)
+    # )
+
+    model = define_model(
+        name=config['MODEL']['model_name'],
+        encoder_name=config['MODEL']['encoder_name'],
+        encoder_weights = config['MODEL']['encoder_weights'],
+        in_channel=len(config['DATASET']['bands']),
+        out_channels=config['MODEL']['num_classes'],
+        activation=config['MODEL']['activation'])
     
     model.load_state_dict(ckpt['model_state'])
     model.to(device)
@@ -116,19 +125,21 @@ def run_inference(patch_file, model, device, mean, std, save_dir="inference_outp
 
     # Forward pass
     with torch.no_grad():
-        logits, attn_maps = model(inp)
-        probs = torch.softmax(logits, dim=1)[0, 1].item()
-        pred = int(probs >= 0.7)
+        logits= model(inp)
+        #probs = torch.softmax(logits, dim=1)[0, 1].item() #MIL
+        #pred = int(probs >= 0.7)
+        probs = torch.softmax(logits, dim=1)[:, 1, :, :] #Segmentation
+        pred = (probs > 0.7).float() 
 
     print(f"Prediction: {pred} | Prob(mucilage)={probs:.3f}")
 
-    # Save attention maps
-    if pred == 1:  # only for mucilage
-        patch_img = patch  # already normalized → convert back to RGB for display
-        save_path = os.path.join(save_dir, "attention_tuj.png")
-        per_sample_maps = [head[0] for head in attn_maps]  # extract from batch
-        save_multi_attention(per_sample_maps, patch_img, save_path=save_path)
-        print(f"Saved attention maps → {save_path}")
+    # # Save attention maps
+    # if pred == 1:  # only for mucilage
+    #     patch_img = patch  # already normalized → convert back to RGB for display
+    #     save_path = os.path.join(save_dir, "attention_tuj.png")
+    #     per_sample_maps = [head[0] for head in attn_maps]  # extract from batch
+    #     save_multi_attention(per_sample_maps, patch_img, save_path=save_path)
+    #     print(f"Saved attention maps → {save_path}")
 
 
 if __name__ == "__main__":
@@ -136,8 +147,8 @@ if __name__ == "__main__":
     #parser.add_argument("--patch_file", type=str, required=True, help="Path to input .npy patch file [H,W,C]")
     parser.add_argument("--zarr_file", type=str, default="/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_inference/target/S2A_MSIL2A_20250809T100041_N0511_R122_T32TQQ_20250809T122414.zarr", help="Path to input .zarr file")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to trained model .pth")
-    parser.add_argument("--lat", type=float, default=44, help="Latitude of patch center")
-    parser.add_argument("--lon", type=float, default=13, help="Longitude of patch center")
+    parser.add_argument("--lat", type=float, default=44.8, help="Latitude of patch center")
+    parser.add_argument("--lon", type=float, default=12.6, help="Longitude of patch center")
     args = parser.parse_args()
 
     # Crop patch
@@ -162,4 +173,4 @@ if __name__ == "__main__":
 
     # Save RGB for reference
     rgb = get_rgb(patch)
-    plt.imsave(os.path.join("inference_outputs", "input_rgb_tuj_1_test.png"), rgb)
+    plt.imsave(os.path.join("inference_outputs", "input_rgb_seg_test.png"), rgb)

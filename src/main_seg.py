@@ -18,7 +18,7 @@ from dataset.dataset import Sentinel2PatchDataset, Sentinel2NumpyDataset
 from dataset.loader import define_loaders, define_model
 from model_zoo.models import CNN, MILResNet, MILResNetMultiHead, build_timm_model
 from torch.utils.data import DataLoader
-from training.optim import EarlyStopping
+from training.optim import EarlyStopping, dice_loss_multiclass, combined_ce_dice_loss
 from utils.plot import save_attention, save_multi_attention
 #from training.metrics import MultiSpectralMetrics, avg_metric_bands
 
@@ -58,26 +58,6 @@ def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2,
     test_loader  = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     return train_loader, val_loader, test_loader, mean, std
-
-def diversity_loss(attn_maps):
-    # attn_maps: [B, H, W]
-    if isinstance(attn_maps, list):
-        attn_maps = torch.stack(attn_maps, dim=0)
-    B, Hn, H, W = attn_maps.shape
-    attn_maps = attn_maps.view(B, Hn, -1)  # [B, num_heads, N]
-    # Flatten
-    attn_maps = attn_maps / (attn_maps.sum(dim=2, keepdim=True) + 1e-8)
-    # Compute pairwise similarity between heads
-    sims = []
-    for i in range(Hn):
-        for j in range(i + 1, Hn):
-            sim = torch.sum(attn_maps[:, i, :] * attn_maps[:, j, :], dim=1)  # [B]
-            sims.append(sim.mean())
-
-    if len(sims) == 0:
-        return torch.tensor(0.0, device=attn_maps.device)
-
-    return torch.stack(sims).mean()
 
 
 def build_model(config):
@@ -122,22 +102,20 @@ def build_opt(model, config, y=None, device="cpu"):
         logger.info(f"Scheduler: {config['TRAINING']['scheduler_type']}")
 
     # ----- Loss function -----
-    if y is not None:
-        class_counts = np.bincount(y)
-        weights = 1.0 / class_counts
-        weights = torch.tensor(weights, dtype=torch.float).to(device)
+    class_counts = np.bincount(y)
+    weights = 1.0 / class_counts
+    weights = torch.tensor(weights, dtype=torch.float).to(device)
 
-        if config['MODEL']['num_classes'] == 1:
-            logger.info("Using weighted BCEWithLogitsLoss")
-            criterion = nn.BCEWithLogitsLoss(pos_weight=weights[1])
-        else:
-            logger.info(f"Using weighted CrossEntropyLoss with weights={weights}")
-            criterion = nn.CrossEntropyLoss(weight=weights)
+    if config['MODEL']['num_classes'] == 1:
+        logger.info("Using weighted BCEWithLogitsLoss")
+        criterion = nn.BCEWithLogitsLoss(pos_weight=weights[1])
     else:
-        if config['MODEL']['num_classes'] == 1:
-            criterion = nn.BCEWithLogitsLoss()
-        else:
-            criterion = nn.CrossEntropyLoss()
+        logger.info(f"Using weighted CrossEntropyLoss with weights={weights}")
+        #criterion = nn.CrossEntropyLoss(weight=weights)
+        print("Using combined CE + Dice loss")
+        criterion = lambda logits, masks: combined_ce_dice_loss(
+        logits, masks, ce_weight=0.5, class_weights=weights
+        )
 
     return optimizer, criterion, scheduler_class
 
@@ -209,10 +187,11 @@ def evaluate_model(model, val_loader, criterion, device):
     return epoch_loss, epoch_acc
 
 
+@track_emissions(save_to_api=True, experiment_id="91ba3396-1ad3-40a0-b64f-df074b7af5a7")
 def test_model(model, test_loader, criterion, device, save_preds_dir=None):
     model.eval()
     running_loss, running_acc, total = 0.0, 0.0, 0
-    all_preds, all_masks = [], []
+    y_true_all, y_prob_all, y_pred_all = [], [], []
 
     if save_preds_dir:
         os.makedirs(save_preds_dir, exist_ok=True)
@@ -223,12 +202,14 @@ def test_model(model, test_loader, criterion, device, save_preds_dir=None):
             outputs = model(inputs)
             loss = criterion(outputs, masks)
 
-            # ---- Handle binary vs multi-class ----
-            if outputs.shape[1] == 1:  # Binary
-                preds = (torch.sigmoid(outputs) > 0.5).float()
+            # Handle binary vs multi-class
+            if outputs.shape[1] == 1:  # Binary segmentation
+                probs = torch.sigmoid(outputs)
+                preds = (probs > 0.5).float().squeeze(1)
                 acc = (preds == masks).float().mean().item()
-            else:  # Multi-class
-                preds = torch.argmax(outputs, dim=1)
+            else:
+                probs = torch.softmax(outputs, dim=1)[:, 1, :, :]  # shape [B, H, W]
+                preds = (probs > 0.5).float()
                 if masks.ndim == 4:
                     masks = masks.squeeze(1)
                 acc = (preds == masks).float().mean().item()
@@ -237,8 +218,9 @@ def test_model(model, test_loader, criterion, device, save_preds_dir=None):
             running_acc += acc * inputs.size(0)
             total += inputs.size(0)
 
-            all_preds.append(preds.cpu())
-            all_masks.append(masks.cpu())
+            y_true_all.append(masks.detach().cpu().numpy().ravel())
+            y_prob_all.append(probs.detach().cpu().numpy().ravel())
+            y_pred_all.append(preds.detach().cpu().numpy().ravel())
 
             # Optionally save some predictions as .png
             if save_preds_dir:
@@ -250,10 +232,17 @@ def test_model(model, test_loader, criterion, device, save_preds_dir=None):
     epoch_loss = running_loss / total
     epoch_acc = running_acc / total
 
-    all_preds = torch.cat(all_preds, dim=0)
-    all_masks = torch.cat(all_masks, dim=0)
+    y_true = np.concatenate(y_true_all)
+    y_prob = np.concatenate(y_prob_all)
+    y_pred = np.concatenate(y_pred_all)
 
-    return epoch_loss, epoch_acc, all_preds, all_masks
+    results = pd.DataFrame({
+        "y_true": y_true,
+        "y_pred": y_pred,
+        "y_prob": y_prob
+    })
+
+    return epoch_loss, epoch_acc, results
 
 
 
@@ -279,10 +268,14 @@ def main():
     # --- Data ---
     df_train, df_val, df_test = split_data(args.patch_csv)
     train_loader, val_loader, test_loader, mean, std = prepare_data(df_train, df_val, df_test, bands, batch_size, res=res)
+    all_masks = []
+    for _, mask in train_loader.dataset:
+        all_masks.append(mask.cpu().numpy().astype(int).ravel())
+    y = np.concatenate(all_masks)
 
     # --- Model, optimizer, criterion ---
     model, device = build_model(config)
-    optimizer, criterion, scheduler = build_opt(model, config, device=device)
+    optimizer, criterion, scheduler = build_opt(model, config, y, device=device)
 
     # --- Training history ---
     history = {"epoch": [], "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
@@ -309,11 +302,15 @@ def main():
             print(f"Early stopping at epoch {epoch+1}")
             break
 
+        # Save metrics to CSV
+        df_hist = pd.DataFrame(history)
+        df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_unet.csv"), index=False)
+
         del train_loss, train_acc, val_loss, val_acc
         torch.cuda.empty_cache()
         gc.collect()
 
-    # --- Save model checkpoint ---
+    # Save model checkpoint
     checkpoint_path = os.path.join(SRC_DIR, "training/unet_checkpoint.pth")
     torch.save({
         "model_state": model.state_dict(),
@@ -323,9 +320,9 @@ def main():
     }, checkpoint_path)
     print(f"Checkpoint saved to {checkpoint_path}")
 
-    # --- Final test evaluation ---
+    # Final test evaluation
     print("\n Running final test evaluation...")
-    test_loss, test_acc, preds, masks = test_model(
+    test_loss, test_acc, results = test_model(
         model,
         test_loader,
         criterion,
@@ -334,6 +331,7 @@ def main():
     )
 
     print(f"Final Test Loss: {test_loss:.4f} | Test Pixel Accuracy: {test_acc:.4f}")
+    results.to_csv(os.path.join(SRC_DIR, "test_predictions_unet.csv"), index=False)
 
 if __name__ == "__main__":
     main()
