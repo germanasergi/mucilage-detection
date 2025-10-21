@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from dataset.patches import *
+from torchvision import transforms
 
 class Sentinel2PatchDataset(Dataset):
     """
@@ -71,7 +72,7 @@ class Sentinel2PatchDataset(Dataset):
 
 
 class Sentinel2NumpyDataset(Dataset):
-    def __init__(self, df, bands, patch_size=256, target_res="r10m", transform=None, cache_file=None, masks = None, task = "classification"):
+    def __init__(self, df, bands, patch_size=256, target_res="r10m", transform=False, cache_file=None, masks = None, task = "classification"):
         """
         Args:
             df (pd.DataFrame): containing [zarr_path, x, y, label].
@@ -89,14 +90,22 @@ class Sentinel2NumpyDataset(Dataset):
         self.masks = masks
         self.task = task
 
+        # Add transforms for segmentation
+        if self.task == "segmentation" and self.transform == True:
+            self.transform = transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomVerticalFlip(),
+                transforms.RandomRotation(90)
+            ])
+
+        # Load cached dataset
         if self.cache_file and os.path.exists(self.cache_file):
-            # Load cached dataset
             print(f"Loading cached dataset from {self.cache_file}")
             cache = np.load(self.cache_file)
             self.X = cache["X"]
             if self.task == "segmentation":
                 masks = np.load(self.masks)
-                self.y = masks["M"]
+                self.y = masks["masks"]
             elif self.task == "classification":
                 self.y = cache["y"]
         else:

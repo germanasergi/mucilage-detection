@@ -70,6 +70,7 @@ def define_model(
             encoder_weights=encoder_weights,
             in_channels=in_channel,
             classes=out_channels,
+            decoder_attention_type="scse",
             activation=None,
         )
 

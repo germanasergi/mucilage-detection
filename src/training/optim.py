@@ -1,7 +1,8 @@
+import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR  # or another scheduler
+import torch.nn as nn
 import torch.nn.functional as F
-import torch
 
 # Adam optimizer with weight decay
 """
@@ -56,6 +57,25 @@ def combined_ce_dice_loss(logits, targets, ce_weight=0.5, class_weights=None):
     ce = F.cross_entropy(logits, targets.long(), weight=class_weights)
     dice = dice_loss_multiclass(logits, targets)
     return ce_weight * ce + (1 - ce_weight) * dice
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2.0, alpha=None, reduction='mean'):
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+    def forward(self, inputs, targets):
+        # inputs: logits [B,1,H,W], targets: [B,H,W] or [B,1,H,W]
+        if targets.ndim==3: targets = targets.unsqueeze(1)
+        p = torch.sigmoid(inputs)
+        ce = F.binary_cross_entropy_with_logits(inputs, targets.float(), reduction='none')
+        p_t = p*targets + (1-p)*(1-targets)
+        mod = (1 - p_t) ** self.gamma
+        loss = mod * ce
+        if self.alpha is not None:
+            alpha_t = self.alpha * targets + (1-self.alpha)*(1-targets)
+            loss = alpha_t * loss
+        return loss.mean()
 
 
 class EarlyStopping:

@@ -18,7 +18,7 @@ from dataset.dataset import Sentinel2PatchDataset, Sentinel2NumpyDataset
 from dataset.loader import define_loaders, define_model
 from model_zoo.models import CNN, MILResNet, MILResNetMultiHead, build_timm_model
 from torch.utils.data import DataLoader
-from training.optim import EarlyStopping, dice_loss_multiclass, combined_ce_dice_loss
+from training.optim import EarlyStopping, dice_loss_multiclass, combined_ce_dice_loss, FocalLoss
 from utils.plot import save_attention, save_multi_attention
 #from training.metrics import MultiSpectralMetrics, avg_metric_bands
 
@@ -40,10 +40,20 @@ def split_data(labels_file, test_size=0.3, val_size=0.5, seed=42):
     return df_train, df_val, df_test
 
 
+def filter_mucilage_patches(df, mask_file):
+    """
+    Keep only patches whose mask contains mucilage pixels.
+    Assumes same order between df and masks in mask_file.
+    """
+    masks = np.load(mask_file)["masks"]  # shape (N, H, W)
+    keep_indices = [i for i, mask in enumerate(masks) if np.any(mask > 0)]
+    return df.iloc[keep_indices].reset_index(drop=True)
+
+
 def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2, res="r10m"):
-    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache.npz", masks="saved_npy/train_masks_refined.npz", task="segmentation")
-    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz", masks="saved_npy/val_masks_refined.npz", task="segmentation")
-    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz", masks="saved_npy/test_masks_refined.npz", task="segmentation")
+    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache.npz", masks="roboflow_dataset_all/saved_masks/train_masks.npz", task="segmentation", transform=True)
+    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz", masks="roboflow_dataset_all/saved_masks/val_masks.npz", task="segmentation")
+    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz", masks="roboflow_dataset_all/saved_masks/test_masks.npz", task="segmentation")
 
     # Normalize
     mean = np.nanmean(train_ds.X, axis=(0,1,2))
@@ -108,14 +118,14 @@ def build_opt(model, config, y=None, device="cpu"):
 
     if config['MODEL']['num_classes'] == 1:
         logger.info("Using weighted BCEWithLogitsLoss")
-        criterion = nn.BCEWithLogitsLoss(pos_weight=weights[1])
+        criterion = FocalLoss(alpha=0.95, gamma=2) #nn.BCEWithLogitsLoss(pos_weight=weights[1])
     else:
         logger.info(f"Using weighted CrossEntropyLoss with weights={weights}")
-        #criterion = nn.CrossEntropyLoss(weight=weights)
-        print("Using combined CE + Dice loss")
-        criterion = lambda logits, masks: combined_ce_dice_loss(
-        logits, masks, ce_weight=0.5, class_weights=weights
-        )
+        criterion = nn.CrossEntropyLoss(weight=weights)
+        # print("Using combined CE + Dice loss")
+        # criterion = lambda logits, masks: combined_ce_dice_loss(
+        # logits, masks, ce_weight=0.5, class_weights=weights
+        # )
 
     return optimizer, criterion, scheduler_class
 
@@ -136,7 +146,7 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device):
         # ---- Compute pixel accuracy ----
         with torch.no_grad():
             if outputs.shape[1] == 1:  # Binary segmentation
-                preds = (torch.sigmoid(outputs) > 0.5).float()
+                preds = (torch.sigmoid(outputs) > 0.8).float()
                 acc = (preds == masks).float().mean().item()
             else:  # Multi-class segmentation
                 preds = torch.argmax(outputs, dim=1)
@@ -170,7 +180,7 @@ def evaluate_model(model, val_loader, criterion, device):
 
             # ---- Pixel accuracy ----
             if outputs.shape[1] == 1:  # Binary
-                preds = (torch.sigmoid(outputs) > 0.5).float()
+                preds = (torch.sigmoid(outputs) > 0.8).float()
                 acc = (preds == masks).float().mean().item()
             else:  # Multi-class
                 preds = torch.argmax(outputs, dim=1)
@@ -205,11 +215,11 @@ def test_model(model, test_loader, criterion, device, save_preds_dir=None):
             # Handle binary vs multi-class
             if outputs.shape[1] == 1:  # Binary segmentation
                 probs = torch.sigmoid(outputs)
-                preds = (probs > 0.5).float().squeeze(1)
+                preds = (probs > 0.8).float().squeeze(1)
                 acc = (preds == masks).float().mean().item()
             else:
                 probs = torch.softmax(outputs, dim=1)[:, 1, :, :]  # shape [B, H, W]
-                preds = (probs > 0.5).float()
+                preds = (probs > 0.8).float()
                 if masks.ndim == 4:
                     masks = masks.squeeze(1)
                 acc = (preds == masks).float().mean().item()
@@ -267,7 +277,8 @@ def main():
 
     # --- Data ---
     df_train, df_val, df_test = split_data(args.patch_csv)
-    train_loader, val_loader, test_loader, mean, std = prepare_data(df_train, df_val, df_test, bands, batch_size, res=res)
+    df_train_filtered = filter_mucilage_patches(df_train, mask_file="roboflow_dataset_all/saved_masks/train_masks.npz")
+    train_loader, val_loader, test_loader, mean, std = prepare_data(df_train_filtered, df_val, df_test, bands, batch_size, res=res)
     all_masks = []
     for _, mask in train_loader.dataset:
         all_masks.append(mask.cpu().numpy().astype(int).ravel())

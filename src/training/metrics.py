@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import math
 import numpy as np
-from sklearn.metrics import auc, roc_auc_score, roc_curve, precision_recall_curve
+from sklearn.metrics import auc, roc_auc_score, roc_curve, precision_recall_curve, f1_score, precision_score, recall_score
 
 
 def plot_curve(df):
@@ -67,15 +67,86 @@ def plot_false_positives(test_numpy, results, save_dir="plots", ncols=5):
     plt.savefig(os.path.join(save_dir, "false_positives.png"))
     plt.show()
 
+
+def plot_segmentation_false_positives(
+    test_patches,        # numpy array (N, H, W, C)
+    results,             # numpy array (N, H, W)
+    save_dir="plots",
+    ncols=3,
+    highlight_color=(1, 0, 0, 0.5)  # red overlay for FPs
+    ):
+    """
+    Visualize segmentation false positives (pred=1, gt=0).
+    Highlights false positive pixels in red over the RGB image.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    pred_masks = (results["y_pred"].values.reshape(-1, 256, 256)).astype(int)
+    gt_masks = (results["y_true"].values.reshape(-1, 256, 256)).astype(int)
+
+    # Find patches that contain at least one false positive pixel
+    fp_idx = [
+        i for i in range(len(gt_masks))
+        if np.any((pred_masks[i] == 1) & (gt_masks[i] == 0))
+    ]
+    if not fp_idx:
+        print("No false positives found.")
+        return
+    
+    nrows = len(fp_idx[:30])
+    print(f"Found {len(fp_idx)} patches with false positives")
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols*3, nrows*3))
+    if nrows == 1:
+        axes = np.expand_dims(axes, 0)  # handle single case
+
+    for r, i in enumerate(fp_idx[:30]):  # Show up to 15 examples
+        patch = test_patches[i]
+        gt = gt_masks[i]
+        pred = pred_masks[i]
+
+        # Normalize RGB
+        rgb = patch[:, :, [3, 2, 1]]
+        p2, p98 = np.nanpercentile(rgb, (2, 98))
+        rgb = np.clip((rgb - p2) / (p98 - p2 + 1e-6), 0, 1)
+
+        # Create color overlay for errors
+        overlay = np.zeros_like(rgb)
+        overlay[(pred == 1) & (gt == 1)] = [0, 1, 0]   # True Positive → Green
+        overlay[(pred == 1) & (gt == 0)] = [1, 0, 0]   # False Positive → Red
+        overlay[(pred == 0) & (gt == 1)] = [0, 0, 1]   # False Negative → Blue
+
+        # Panels
+        axes[r, 0].imshow(rgb)
+        axes[r, 0].set_title(f"RGB Patch {i}")
+        axes[r, 0].axis("off")
+
+        axes[r, 1].imshow(gt, cmap="gray")
+        axes[r, 1].set_title("Ground Truth")
+        axes[r, 1].axis("off")
+
+        axes[r, 2].imshow(rgb)
+        axes[r, 2].imshow(overlay, alpha=0.5)
+        axes[r, 2].set_title("Prediction Overlay")
+        axes[r, 2].axis("off")
+
+    plt.tight_layout()
+    save_path = os.path.join(save_dir, "fp_triplets.png")
+    plt.savefig(save_path, dpi=200)
+    plt.show()
+    print(f"Saved visualization to {save_path}")
+
+
 def plot_auc(results):
     y_true = results["y_true"].values
     y_score = results["y_prob"].values
+    y_pred = results["y_pred"].values
 
     fpr, tpr, roc_thresholds = roc_curve(y_true, y_score)
     auc_value = roc_auc_score(y_true, y_score)
 
     precision, recall, thresholds = precision_recall_curve(y_true, y_score)
     pr_auc = auc(recall, precision)
+    print(f"Precision: {precision_score(y_true, y_pred)}, Recall: {recall_score(y_true, y_pred)}")
+    print(f"F1 Score: {f1_score(y_true, y_pred)}")
     print(f"Precision-Recall AUC: {pr_auc:.4f}")
 
     plt.figure()
@@ -101,6 +172,7 @@ def main():
 
     plot_curve(df)
     #plot_false_positives(test_numpy, results)
+    plot_segmentation_false_positives(test_patches=test_numpy, results=results)
     plot_auc(results)
 
 if __name__ == "__main__":
