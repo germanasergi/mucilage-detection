@@ -1,6 +1,7 @@
 import numpy as np
 from torch.utils.data import DataLoader
 import segmentation_models_pytorch as smp
+import torch.nn as nn
 
 
 def define_loaders(
@@ -48,8 +49,6 @@ def define_loaders(
     return train_loader
 
 
-import segmentation_models_pytorch as smp
-import torch.nn as nn
 
 def define_model(
     name,

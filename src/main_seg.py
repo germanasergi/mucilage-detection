@@ -51,9 +51,9 @@ def filter_mucilage_patches(df, mask_file):
 
 
 def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2, res="r10m"):
-    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache.npz", masks="roboflow_dataset_all/saved_masks/train_masks.npz", task="segmentation", transform=True)
-    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz", masks="roboflow_dataset_all/saved_masks/val_masks.npz", task="segmentation")
-    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz", masks="roboflow_dataset_all/saved_masks/test_masks.npz", task="segmentation")
+    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache_augmented.npz", masks="roboflow_dataset/saved_masks/train_masks_augmented.npz", task="segmentation", transform=False)
+    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz", masks="roboflow_dataset/saved_masks/val_masks.npz", task="segmentation")
+    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz", masks="roboflow_dataset/saved_masks/test_masks.npz", task="segmentation")
 
     # Normalize
     mean = np.nanmean(train_ds.X, axis=(0,1,2))
@@ -277,8 +277,8 @@ def main():
 
     # --- Data ---
     df_train, df_val, df_test = split_data(args.patch_csv)
-    df_train_filtered = filter_mucilage_patches(df_train, mask_file="roboflow_dataset_all/saved_masks/train_masks.npz")
-    train_loader, val_loader, test_loader, mean, std = prepare_data(df_train_filtered, df_val, df_test, bands, batch_size, res=res)
+    #df_train_filtered = filter_mucilage_patches(df_train, mask_file="roboflow_dataset/saved_masks/train_masks_augmented.npz")
+    train_loader, val_loader, test_loader, mean, std = prepare_data(df_train, df_val, df_test, bands, batch_size, res=res)
     all_masks = []
     for _, mask in train_loader.dataset:
         all_masks.append(mask.cpu().numpy().astype(int).ravel())
