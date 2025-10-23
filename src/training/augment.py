@@ -49,5 +49,5 @@ print(f"Augmented mucilage patches: {augmented_mucilage_count}")
 
 # Save
 os.makedirs("saved_npy", exist_ok=True)
-np.savez_compressed("/home/ubuntu/mucilage_pipeline/mucilage-detection/saved_npy/train_cache_augmented.npz", X=X_aug)
+#np.savez_compressed("/home/ubuntu/mucilage_pipeline/mucilage-detection/saved_npy/train_cache_augmented.npz", X=X_aug)
 np.savez_compressed("/home/ubuntu/mucilage_pipeline/mucilage-detection/roboflow_dataset/saved_masks/train_masks_augmented.npz", masks=M_aug)

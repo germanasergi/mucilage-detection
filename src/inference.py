@@ -3,6 +3,7 @@ import argparse
 import torch
 import numpy as np
 import pyproj
+import cv2
 import xarray as xr
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -107,8 +108,26 @@ def get_rgb(patch):
     
     return rgb
 
+def show_amei(patch, eps=1e-6, ax=None):
+    green = patch[:, :, 2]
+    red = patch[:,:,3]
+    nir = patch[:,:,7]
+    swir = patch[:,:,10]
+    denom = green + 0.25 * swir
+    amei  = (2*red + nir - 2*swir) / (denom + eps)
 
-def run_inference(patch_file, model, device, mean, std, save_dir="inference_outputs"):
+    p2, p98 = np.nanpercentile(amei, (2, 98))
+    amei = np.clip((amei - p2) / (p98 - p2), 0, 1)
+    cmap = plt.cm.turbo
+
+    if ax is None:
+        ax = plt.gca()
+    ax.imshow(amei, cmap=cmap)
+    ax.axis("off")
+    return ax
+
+
+def run_inference(patch_file, model, device, mean, std, task = "classification", save_dir="inference_outputs"):
     os.makedirs(save_dir, exist_ok=True)
 
     # Load patch (assume npy [H, W, C])
@@ -124,14 +143,59 @@ def run_inference(patch_file, model, device, mean, std, save_dir="inference_outp
     inp = torch.tensor(patch, dtype=torch.float).permute(2, 0, 1).unsqueeze(0).to(device)  # [1, C, H, W]
 
     # Forward pass
-    with torch.no_grad():
-        logits= model(inp)
-        #probs = torch.softmax(logits, dim=1)[0, 1].item() #MIL
-        #pred = int(probs >= 0.7)
-        probs = torch.softmax(logits, dim=1)[:, 1, :, :] #Segmentation
-        pred = (probs > 0.7).float() 
+    if task == "classification":
+        with torch.no_grad():
+            logits= model(inp)
+            #probs = torch.softmax(logits, dim=1)[0, 1].item() #MIL
+            #pred = int(probs >= 0.7)
+            probs = torch.softmax(logits, dim=1)[:, 1, :, :] #Segmentation
+            pred = (probs > 0.7).float() 
 
-    print(f"Prediction: {pred} | Prob(mucilage)={probs:.3f}")
+        print(f"Prediction: {pred} | Prob(mucilage)={probs:.3f}")
+
+    elif task == "segmentation":
+        with torch.no_grad():
+            logits = model(inp)
+            if logits.shape[1] == 1:
+                probs = torch.sigmoid(logits).squeeze().cpu().numpy()
+            else:
+                probs = torch.softmax(logits, dim=1)[:, 1, :, :].squeeze().cpu().numpy()
+
+            pred = (probs > 0.5).astype(np.uint8)
+
+        print(f"Segmentation done")
+        
+        # Overlay mask on RGB
+        rgb = get_rgb(patch)
+        overlay = rgb.copy()
+        mask = pred.astype(bool)
+
+        # Define a strong red color overlay
+        red_mask = np.zeros_like(rgb)
+        red_mask[..., 0] = 1.0  # pure red
+        alpha = 0.6
+        overlay = np.where(mask[..., None], (1 - alpha) * rgb + alpha * red_mask, rgb)
+
+        fig, axes = plt.subplots(1, 4, figsize=(12, 4))
+        axes[0].imshow(rgb)
+        axes[0].set_title("Input RGB")
+        axes[0].axis("off")
+
+        axes[1].imshow(probs, cmap="viridis")
+        axes[1].set_title("Predicted Probability")
+        axes[1].axis("off")
+
+        axes[2].imshow(overlay)
+        axes[2].set_title("Overlay (Red = mucilage)")
+        axes[2].axis("off")
+
+        # AMEI visualization
+        show_amei(patch, ax=axes[3])
+        axes[3].set_title("AMEI")
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(save_dir, "segmentation_result_amei.png"), dpi=200)
+        plt.show()
 
     # # Save attention maps
     # if pred == 1:  # only for mucilage
@@ -147,6 +211,7 @@ if __name__ == "__main__":
     #parser.add_argument("--patch_file", type=str, required=True, help="Path to input .npy patch file [H,W,C]")
     parser.add_argument("--zarr_file", type=str, default="/home/ubuntu/mucilage_pipeline/mucilage-detection/data/adr_inference/target/S2A_MSIL2A_20250809T100041_N0511_R122_T32TQQ_20250809T122414.zarr", help="Path to input .zarr file")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to trained model .pth")
+    parser.add_argument("--task", type=str, default="classification", help="Task type: classification or segmentation")
     parser.add_argument("--lat", type=float, default=44.8, help="Latitude of patch center")
     parser.add_argument("--lon", type=float, default=12.6, help="Longitude of patch center")
     args = parser.parse_args()
@@ -169,8 +234,9 @@ if __name__ == "__main__":
     model = load_model(config, ckpt, device)
 
     # Run inference
-    run_inference(patch, model, device, ckpt['mean'], ckpt['std'])
+    run_inference(patch, model, device, ckpt['mean'], ckpt['std'], task=args.task, save_dir="inference_outputs")
 
-    # Save RGB for reference
-    rgb = get_rgb(patch)
-    plt.imsave(os.path.join("inference_outputs", "input_rgb_seg_test.png"), rgb)
+    if args.task == "classification":
+        # Save RGB for reference
+        rgb = get_rgb(patch)
+        plt.imsave(os.path.join("inference_outputs", "input_rgb_class_test.png"), rgb)
