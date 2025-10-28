@@ -5,12 +5,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-import torch
-import torch.nn as nn
-import torch.optim as optim
+from datetime import datetime
 import yaml
 from loguru import logger
 from tqdm import tqdm
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from sklearn.model_selection import train_test_split
 
 from utils.utils import load_config
@@ -20,6 +22,7 @@ from model_zoo.models import CNN, MILResNet, MILResNetMultiHead, build_timm_mode
 from torch.utils.data import DataLoader
 from training.optim import EarlyStopping, dice_loss_multiclass, combined_ce_dice_loss, FocalLoss
 from utils.plot import save_attention, save_multi_attention
+from generate_dataset.generate_ds import setup_environment
 #from training.metrics import MultiSpectralMetrics, avg_metric_bands
 
 # Code carbon
@@ -50,10 +53,10 @@ def filter_mucilage_patches(df, mask_file):
     return df.iloc[keep_indices].reset_index(drop=True)
 
 
-def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2, res="r10m"):
-    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache_augmented.npz", masks="roboflow_dataset/saved_masks/train_masks_augmented.npz", task="segmentation", transform=False)
-    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz", masks="roboflow_dataset/saved_masks/val_masks.npz", task="segmentation")
-    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz", masks="roboflow_dataset/saved_masks/test_masks.npz", task="segmentation")
+def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2, res="r10m", bbox=None, date=None, pat=None):
+    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, masks="roboflow_dataset/saved_masks/train_masks_augmented.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
+    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, masks="roboflow_dataset/saved_masks/val_masks.npz", task="segmentation", bbox=bbox, date=date, pat=pat)
+    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, masks="roboflow_dataset/saved_masks/test_masks.npz", task="segmentation", bbox=bbox, date=date, pat=pat)
 
     # Normalize
     mean = np.nanmean(train_ds.X, axis=(0,1,2))
@@ -267,18 +270,24 @@ def main():
 
     # --- Load config ---
     config = load_config(config_path=os.path.join(CFG_DIR, 'config.yaml'))
+    config_dataset = load_config(config_path=os.path.join(CFG_DIR, 'config_dataset.yaml'))
+    env = setup_environment(config_dataset)
 
     # --- Parameters from config ---
     bands = config['DATASET']['bands']
     num_epochs = config['TRAINING']['num_epochs']
     batch_size = config['TRAINING']['batch_size']
     res = config['DATASET']['res']
-    pat = config['TRAINING']['patience']
+    bbox = config_dataset['query']['bbox']
+    pat = env['PAT']
+    start_date = datetime.strptime(config_dataset['query']['start_date'], '%Y-%m-%d')
+    end_date = datetime.strptime(config_dataset['query']['end_date'], '%Y-%m-%d')
+    mid_date = start_date + (end_date - start_date) / 2
 
     # --- Data ---
     df_train, df_val, df_test = split_data(args.patch_csv)
     #df_train_filtered = filter_mucilage_patches(df_train, mask_file="roboflow_dataset/saved_masks/train_masks_augmented.npz")
-    train_loader, val_loader, test_loader, mean, std = prepare_data(df_train, df_val, df_test, bands, batch_size, res=res)
+    train_loader, val_loader, test_loader, mean, std = prepare_data(df_train, df_val, df_test, bands, batch_size, res=res, bbox=bbox, date=mid_date, pat=pat)
     all_masks = []
     for _, mask in train_loader.dataset:
         all_masks.append(mask.cpu().numpy().astype(int).ravel())

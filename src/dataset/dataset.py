@@ -72,7 +72,7 @@ class Sentinel2PatchDataset(Dataset):
 
 
 class Sentinel2NumpyDataset(Dataset):
-    def __init__(self, df, bands, patch_size=256, target_res="r10m", transform=False, cache_file=None, masks = None, task = "classification"):
+    def __init__(self, df, bands, patch_size=256, target_res="r10m", transform=False, cache_file=None, masks = None, task = "classification", bbox=None, date=None, pat=None):
         """
         Args:
             df (pd.DataFrame): containing [zarr_path, x, y, label].
@@ -89,6 +89,9 @@ class Sentinel2NumpyDataset(Dataset):
         self.cache_file = cache_file
         self.masks = masks
         self.task = task
+        self.bbox = bbox
+        self.date = date
+        self.pat = pat
 
         # Add transforms for segmentation
         if self.task == "segmentation" and self.transform == True:
@@ -121,7 +124,7 @@ class Sentinel2NumpyDataset(Dataset):
 
         for zarr_path, group in tqdm(self.df.groupby("zarr_path"), desc="Building NumPy dataset"):
             ds = xr.open_datatree(zarr_path, engine="zarr", mask_and_scale=False, chunks={})
-            stack = build_stack(ds, self.bands,  target_res=self.target_res, ref_band="b04")  # (H, W, C)
+            stack = build_stack(ds, self.bands,  target_res=self.target_res, ref_band="b04", bbox=self.bbox, date=self.date, pat=self.pat)  # (H, W, C)
 
             for _, row in group.iterrows():
                 x, y, label = row["x"], row["y"], row["label"]

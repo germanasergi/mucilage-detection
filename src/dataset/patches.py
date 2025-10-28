@@ -5,7 +5,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import rioxarray
+from datetime import datetime
 import glob
+from rasterio.transform import from_origin
 from scipy.ndimage import generate_binary_structure, label, binary_fill_holes, binary_erosion
 
 def compute_amei(ds, eps=1e-6):
@@ -20,15 +22,78 @@ def compute_amei(ds, eps=1e-6):
 
     return amei.rename("amei")  # keep DataArray with name
 
+def load_era5_sst(ds, bbox, target_res, ref_band, date, pat):
+    """
+    Load full ERA5 SST, reproject it to Sentinel-2 grid (EPSG:32633),
+    and match the full 10980×10980 tile extent.
+    """
+    era5 = xr.open_dataset(
+        f"https://edh:{pat}@data.earthdatahub.destine.eu/era5/reanalysis-era5-single-levels-v0.zarr",
+        chunks={},
+        engine="zarr",
+    )
 
-def clean_water_mask(ds):
+    if "sst" not in era5:
+        raise ValueError("ERA5 SST variable not found in dataset.")
+
+    sst = era5["sst"]
+
+    # --- Select closest timestamp ---
+    if date is not None:
+        t = np.datetime64(datetime.fromisoformat(str(date)).replace(tzinfo=None))
+        sst = sst.sel(valid_time=t, method="nearest")
+
+    # --- Rename and orient ---
+    sst = sst.rename({"longitude": "x", "latitude": "y"}).transpose("y", "x")
+    sst = sst.assign_coords(
+        x=((sst.x + 180) % 360) - 180
+        ).sortby("x")
+
+    # --- Assign CRS and geotransform ---
+    sst = sst.rio.write_crs("EPSG:4326")
+    res_x = float(sst.x[1] - sst.x[0])
+    res_y = float(sst.y[1] - sst.y[0])
+    transform = from_origin(
+        west=float(sst.x.min()),
+        north=float(sst.y.max()),
+        xsize=res_x,
+        ysize=abs(res_y)
+    )
+    sst = sst.rio.write_transform(transform)
+
+    # --- Get reference Sentinel-2 band for target grid ---
+    ref = ds[f"measurements/reflectance/{target_res}/{ref_band}"].rio.write_crs("EPSG:32633")
+
+    print(f"[ERA5 SST] Original grid: {sst.shape}, CRS=EPSG:4326 → Reprojecting to match Sentinel-2 tile...")
+
+    # --- Try reprojection ---
+    try:
+        sst_matched = sst.rio.reproject_match(ref)
+    except Exception as e:
+        print(f"[ERA5 SST] Reprojection failed ({e}) → Using fallback interpolation.")
+        sst_matched = sst.interp_like(ref, method="linear")
+
+    # --- Convert from Kelvin to Celsius and fill NaNs ---
+    sst_matched = sst_matched - 273.15
+    sst_matched = sst_matched.fillna(sst_matched.mean())
+
+    # --- Ensure exact shape match ---
+    sst_matched = sst_matched.interp_like(ref, method="nearest")
+
+    print(f"[ERA5 SST] Final shape: {sst_matched.shape}")
+    print(f"[ERA5 SST] Value range (°C): {float(sst_matched.min()):.2f} – {float(sst_matched.max()):.2f}")
+    print(f"[ERA5 SST] NaN ratio: {float(np.isnan(sst_matched).mean()):.4f}")
+
+    return sst_matched
+
+
+def clean_water_mask(ds, target_res="r10m"):
     """
     Fix water mask by:
     1. Keeping only the sea (remove lakes/rivers).
     2. Filling cloud holes in the sea.
     """
-
-    scl = resample_to_10m(ds, 'scl', 'b04', folder='conditions')
+    scl = resample_band(ds, 'scl', target_res=target_res, ref='b04')
     scl = scl.squeeze().values
     raw_water_mask = (scl == 6)
     H, W = raw_water_mask.shape
@@ -77,32 +142,8 @@ def resample_band(ds, band, target_res="r10m", ref="b04", crs="EPSG:32632"):
 
     return band_da.rio.reproject_match(ref_band)
 
-def resample_to_10m(ds, band, ref, folder, res):
-    """
-    Resample band to match the resolution & grid of reference band.
-    ds: opened .zarr datatree
-    band: name of band to resample (string)
-    ref: name of reference band (string)
-    """
-    crs_code = "EPSG:32632"
 
-    # Define reference band
-    ref_band = ds[f"measurements/reflectance/r10m/{ref}"]  # reference (10m red)
-    ref_band = ref_band.rio.write_crs(crs_code, inplace=True)
-
-    # Band to convert
-    if folder == 'measurements':
-        if res == 'r20m':
-            band_old = ds[f"measurements/reflectance/r20m/{band}"]
-        elif res == 'r60m':
-            band_old = ds[f"measurements/reflectance/r60m/{band}"]
-    else:
-        band_old = ds[f"conditions/mask/l2a_classification/r20m/{band}"] # for classification band
-    band_10m = band_old.rio.write_crs(crs_code, inplace=True)  # ensure CRS
-
-    return band_10m.rio.reproject_match(ref_band) # Nearest neighbor by default
-
-def build_stack(ds, bands, target_res="r10m", ref_band="b04", crs="EPSG:32632"):
+def build_stack(ds, bands, target_res="r10m", ref_band="b04", crs="EPSG:32632", bbox=None, date=None, pat=None):
     """
     Build a lazy dask-backed (H, W, C) stack from bands, resampling as needed.
 
@@ -123,8 +164,11 @@ def build_stack(ds, bands, target_res="r10m", ref_band="b04", crs="EPSG:32632"):
            b in ds['measurements/reflectance/r20m'] or \
            b in ds['measurements/reflectance/r60m']:
             arr = resample_band(ds, b, target_res=target_res, ref=ref_band, crs=crs) / 10000.0
-        elif b == "amei":
-            arr = compute_amei(ds)
+        # elif b == "amei":
+        #     arr = compute_amei(ds)
+        elif b == "sst":
+            arr = load_era5_sst(ds, bbox=bbox, target_res=target_res, ref_band=ref_band, date=date, pat=pat)
+            print(f"SST min/max loaded: {float(arr.min().values)}, {float(arr.max().values)}")
         else:
             raise ValueError(f"Band {b} not found or not supported.")
 
@@ -135,37 +179,6 @@ def build_stack(ds, bands, target_res="r10m", ref_band="b04", crs="EPSG:32632"):
     # Concatenate all bands along 'band' dimension
     stacked = xr.concat(stack, dim="band").transpose("y", "x", "band")
     return stacked
-
-
-def build_stack_10m(ds, bands):
-    """
-    Return a lazy dask-backed stack (H, W, C) instead of full NumPy.
-    """
-    stack = []
-
-    for b in bands:
-        if b in ds['measurements/reflectance/r10m']:
-            arr = ds['measurements/reflectance/r10m'][b] / 10000.0
-        elif b in ds['measurements/reflectance/r20m']:
-            res = 'r20m'
-            arr = resample_to_10m(ds, b, 'b04', folder='measurements', res=res) / 10000.0
-        elif b in ds['measurements/reflectance/r60m']:
-            res = 'r60m'
-            arr = resample_to_10m(ds, b, 'b04', folder='measurements', res=res) / 10000.0
-        elif b == "amei":
-            arr = compute_amei(ds)
-        else:
-            raise ValueError(f"Band {b} not found or not supported.")
-
-        if "spatial_ref" not in arr.coords:
-            arr = arr.rio.write_crs("EPSG:32632")
-        # Expand dims and assign band coordinate for all arrays
-        arr = arr.expand_dims(band=[b])
-        stack.append(arr)
-
-    # Concatenate along band dimension lazily
-    stack = xr.concat(stack, dim="band").transpose("y", "x", "band")
-    return stack
 
 
 def sample_patch_corners(water_mask, n_patches, patch_size=256, border_weight=0.6):
