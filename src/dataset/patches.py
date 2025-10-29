@@ -38,46 +38,57 @@ def load_era5_sst(ds, bbox, target_res, ref_band, date, pat):
 
     sst = era5["sst"]
 
-    # --- Select closest timestamp ---
+    # Select closest timestamp
     if date is not None:
         t = np.datetime64(datetime.fromisoformat(str(date)).replace(tzinfo=None))
         sst = sst.sel(valid_time=t, method="nearest")
+    
+    # Get reference Sentinel-2 band for target grid
+    ref = ds[f"measurements/reflectance/{target_res}/{ref_band}"].rio.write_crs("EPSG:32632")
 
-    # --- Rename and orient ---
+    # Convert tile extent from EPSG:32632 (meters) → EPSG:4326 (lon/lat)
+    # using rioxarray’s built-in conversion
+    ref_latlon = ref.rio.reproject("EPSG:4326")
+    lon_min, lat_min, lon_max, lat_max = ref_latlon.rio.bounds()
+
+    if sst.longitude.max() > 180:  # Handle 0–360° convention
+        lon_min = lon_min % 360
+        lon_max = lon_max % 360
+
+    sst = sst.sel(
+        longitude=slice(lon_min - 1.0, lon_max + 1.0),
+        latitude=slice(lat_max + 1.0, lat_min - 1.0),
+    )
+
+    if sst.longitude.size == 0 or sst.latitude.size == 0:
+        raise ValueError("[ERA5 SST] No ERA5 data found near the Sentinel-2 tile extent.")
+
+    # --- Rename dims to match rioxarray convention ---
     sst = sst.rename({"longitude": "x", "latitude": "y"}).transpose("y", "x")
-    sst = sst.assign_coords(
-        x=((sst.x + 180) % 360) - 180
-        ).sortby("x")
 
-    # --- Assign CRS and geotransform ---
+    # Normalize longitude to [-180, 180]
+    if sst.x.max() > 180:
+        sst = sst.assign_coords(x=((sst.x + 180) % 360) - 180).sortby("x")
+
+    # Assign CRS and transform
     sst = sst.rio.write_crs("EPSG:4326")
     res_x = float(sst.x[1] - sst.x[0])
     res_y = float(sst.y[1] - sst.y[0])
-    transform = from_origin(
-        west=float(sst.x.min()),
-        north=float(sst.y.max()),
-        xsize=res_x,
-        ysize=abs(res_y)
-    )
+    transform = from_origin(float(sst.x.min()), float(sst.y.max()), res_x, abs(res_y))
     sst = sst.rio.write_transform(transform)
 
-    # --- Get reference Sentinel-2 band for target grid ---
-    ref = ds[f"measurements/reflectance/{target_res}/{ref_band}"].rio.write_crs("EPSG:32633")
-
-    print(f"[ERA5 SST] Original grid: {sst.shape}, CRS=EPSG:4326 → Reprojecting to match Sentinel-2 tile...")
-
-    # --- Try reprojection ---
+    # Try reprojection
     try:
         sst_matched = sst.rio.reproject_match(ref)
     except Exception as e:
         print(f"[ERA5 SST] Reprojection failed ({e}) → Using fallback interpolation.")
         sst_matched = sst.interp_like(ref, method="linear")
 
-    # --- Convert from Kelvin to Celsius and fill NaNs ---
+    # Convert from Kelvin to Celsius and fill NaNs
     sst_matched = sst_matched - 273.15
     sst_matched = sst_matched.fillna(sst_matched.mean())
 
-    # --- Ensure exact shape match ---
+    # Ensure exact shape match
     sst_matched = sst_matched.interp_like(ref, method="nearest")
 
     print(f"[ERA5 SST] Final shape: {sst_matched.shape}")

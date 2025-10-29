@@ -113,7 +113,12 @@ class Sentinel2NumpyDataset(Dataset):
                 self.y = cache["y"]
         else:
             # Build dataset from zarr files
-            self.X, self.y = self._build_numpy_dataset()
+            if self.task == "classification":
+                self.X, self.y = self._build_numpy_dataset()
+            elif self.task == "segmentation":
+                self.X, _ = self._build_numpy_dataset()
+                masks = np.load(self.masks)
+                self.y = masks["masks"]
             if self.cache_file:
                 print(f"Saving dataset cache to {self.cache_file}")
                 np.savez_compressed(self.cache_file, X=self.X, y=self.y)

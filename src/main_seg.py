@@ -54,9 +54,9 @@ def filter_mucilage_patches(df, mask_file):
 
 
 def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2, res="r10m", bbox=None, date=None, pat=None):
-    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, masks="roboflow_dataset/saved_masks/train_masks_augmented.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
-    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, masks="roboflow_dataset/saved_masks/val_masks.npz", task="segmentation", bbox=bbox, date=date, pat=pat)
-    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, masks="roboflow_dataset/saved_masks/test_masks.npz", task="segmentation", bbox=bbox, date=date, pat=pat)
+    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache_sst_augmented.npz", masks="roboflow_dataset/saved_masks/train_masks_sst_augmented.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
+    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache_sst.npz", masks="roboflow_dataset/saved_masks/val_masks.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
+    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache_sst.npz", masks="roboflow_dataset/saved_masks/test_masks.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
 
     # Normalize
     mean = np.nanmean(train_ds.X, axis=(0,1,2))
@@ -278,6 +278,7 @@ def main():
     num_epochs = config['TRAINING']['num_epochs']
     batch_size = config['TRAINING']['batch_size']
     res = config['DATASET']['res']
+    patience = config['TRAINING']['patience']
     bbox = config_dataset['query']['bbox']
     pat = env['PAT']
     start_date = datetime.strptime(config_dataset['query']['start_date'], '%Y-%m-%d')
@@ -299,7 +300,7 @@ def main():
 
     # --- Training history ---
     history = {"epoch": [], "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
-    early_stopping = EarlyStopping(patience=pat, mode="min")
+    early_stopping = EarlyStopping(patience=patience, mode="min")
 
     for epoch in range(num_epochs):
         train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, criterion, device)

@@ -170,9 +170,9 @@ def main():
     test_numpy = np.load(os.path.join(dir_path,"saved_npy/test_cache.npz"), allow_pickle=True)['X']
     results = pd.read_csv(os.path.join(dir_path,"test_predictions_unet.csv"))
 
-    plot_curve(df)
-    #plot_false_positives(test_numpy, results)
-    plot_segmentation_false_positives(test_patches=test_numpy, results=results)
+    # plot_curve(df)
+    # plot_false_positives(test_numpy, results)
+    # plot_segmentation_false_positives(test_patches=test_numpy, results=results)
     plot_auc(results)
 
 if __name__ == "__main__":

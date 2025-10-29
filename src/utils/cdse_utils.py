@@ -96,6 +96,7 @@ def create_cdse_query_url(
         The collection name (e.g., 'SENTINEL-2', 'SENTINEL-1')
     product_type : str
         The product type (e.g., 'MSIL2A', 'MSIL1C', 'GRD')
+        Look up at : https://documentation.dataspace.copernicus.eu/APIs/On-Demand%20Production%20API.html
     polygon : str
         WKT polygon string for spatial filtering
     start_interval : str
