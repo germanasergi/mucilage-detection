@@ -54,9 +54,9 @@ def filter_mucilage_patches(df, mask_file):
 
 
 def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2, res="r10m", bbox=None, date=None, pat=None):
-    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache_sst_augmented.npz", masks="roboflow_dataset/saved_masks/train_masks_sst_augmented.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
-    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache_sst.npz", masks="roboflow_dataset/saved_masks/val_masks.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
-    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache_sst.npz", masks="roboflow_dataset/saved_masks/test_masks.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
+    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache_sst_cmems_augmented.npz", masks="roboflow_dataset/saved_masks/train_masks_sst_augmented.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
+    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache_sst_cmems.npz", masks="roboflow_dataset/saved_masks/val_masks_sst_cmems.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
+    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache_sst_cmems.npz", masks="roboflow_dataset/saved_masks/test_masks_sst_cmems.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
 
     # Normalize
     mean = np.nanmean(train_ds.X, axis=(0,1,2))
@@ -325,14 +325,14 @@ def main():
 
         # Save metrics to CSV
         df_hist = pd.DataFrame(history)
-        df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_unet.csv"), index=False)
+        #df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_unet.csv"), index=False)
 
         del train_loss, train_acc, val_loss, val_acc
         torch.cuda.empty_cache()
         gc.collect()
 
     # Save model checkpoint
-    checkpoint_path = os.path.join(SRC_DIR, "training/unet_checkpoint.pth")
+    checkpoint_path = os.path.join(SRC_DIR, "training/unet_sst_checkpoint.pth")
     torch.save({
         "model_state": model.state_dict(),
         "mean": mean,
@@ -352,7 +352,7 @@ def main():
     )
 
     print(f"Final Test Loss: {test_loss:.4f} | Test Pixel Accuracy: {test_acc:.4f}")
-    results.to_csv(os.path.join(SRC_DIR, "test_predictions_unet.csv"), index=False)
+    #results.to_csv(os.path.join(SRC_DIR, "test_predictions_unet.csv"), index=False)
 
 if __name__ == "__main__":
     main()

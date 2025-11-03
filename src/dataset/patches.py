@@ -4,6 +4,7 @@ import random
 import numpy as np
 import pandas as pd
 import xarray as xr
+import copernicusmarine as cm
 import rioxarray
 from datetime import datetime
 import glob
@@ -98,6 +99,90 @@ def load_era5_sst(ds, bbox, target_res, ref_band, date, pat):
     return sst_matched
 
 
+def load_cmems_sst(ds, bbox, target_res, ref_band, date):
+    #url = cm.open_dataset(dataset_id="cmems_mod_glo_phy_anfc_0.083deg_P1D-m")
+    lon_min, lat_min, lon_max, lat_max = bbox
+
+    print(f"→ Loading CMEMS SST for {date.date()} and bbox {bbox}")
+
+    # Open remote dataset lazily (no download)
+    cmems = cm.open_dataset(
+        dataset_id="cmems_mod_glo_phy_my_0.083deg_P1D-m",
+        start_datetime=date.strftime("%Y-%m-%d"),
+        end_datetime=date.strftime("%Y-%m-%d")
+    )
+
+
+    # Select surface layer (depth = 0)
+    sst = cmems["thetao"].isel(depth=0)
+
+    # Select time closest to your date (just in case multiple time steps)
+    if "time" in sst.dims and date is not None:
+        t = np.datetime64(datetime.fromisoformat(str(date)).replace(tzinfo=None))
+        sst = sst.sel(time=t, method="nearest")
+
+    # Get reference Sentinel-2 band to define target grid
+    ref = ds[f"measurements/reflectance/{target_res}/{ref_band}"].rio.write_crs("EPSG:32632")
+
+    # Convert tile extent from EPSG:32632 → EPSG:4326
+    ref_latlon = ref.rio.reproject("EPSG:4326")
+    lon_min, lat_min, lon_max, lat_max = ref_latlon.rio.bounds()
+
+    # Handle CMEMS longitude convention (0–360°)
+    if sst.longitude.max() > 180:
+        lon_min = lon_min % 360
+        lon_max = lon_max % 360
+
+    # Handle latitude decreasing order
+    lat0, lat1 = float(sst.latitude[0]), float(sst.latitude[-1])
+    if lat0 > lat1:
+        sst = sst.sel(
+            longitude=slice(lon_min - 1.0, lon_max + 1.0),
+            latitude=slice(lat_max + 1.0, lat_min - 1.0),
+        )
+    else:
+        sst = sst.sel(
+            longitude=slice(lon_min - 1.0, lon_max + 1.0),
+            latitude=slice(lat_min - 1.0, lat_max + 1.0),
+        )
+
+    if sst.longitude.size == 0 or sst.latitude.size == 0:
+        raise ValueError("[CMEMS SST] No data found within Sentinel-2 tile extent (likely land-only area).")
+
+    # Rename for rioxarray compatibility
+    sst = sst.rename({"longitude": "x", "latitude": "y"}).transpose("y", "x")
+
+    # Write CRS and transform
+    sst = sst.rio.write_crs("EPSG:4326")
+    if sst.x.size > 1 and sst.y.size > 1:
+        res_x = float(abs(sst.x[1] - sst.x[0]))
+        res_y = float(abs(sst.y[1] - sst.y[0]))
+    else:
+        res_x = res_y = 0.083  # fallback for 9 km nominal grid
+    transform = from_origin(float(sst.x.min()), float(sst.y.max()), res_x, res_y)
+    sst = sst.rio.write_transform(transform)
+
+    # Try reprojection to match Sentinel-2 grid
+    try:
+        sst_matched = sst.rio.reproject_match(ref)
+    except Exception as e:
+        print(f"[CMEMS SST] Reprojection failed ({e}) → Using fallback interpolation.")
+        sst_matched = sst.interp_like(ref, method="linear")
+
+    # Fill NaNs with mean and ensure shape match
+    sst_matched = sst_matched.fillna(sst_matched.mean())
+    sst_matched = sst_matched.interp_like(ref, method="nearest")
+
+    print(f"[CMEMS SST] Original subset shape: {sst.shape}")
+    print(f"[CMEMS SST] Final shape: {sst_matched.shape}")
+    print(f"[CMEMS SST] Range (°C): {float(sst_matched.min()):.2f} – {float(sst_matched.max()):.2f}")
+    print(f"[CMEMS SST] NaN ratio: {float(np.isnan(sst_matched).mean()):.4f}")
+
+    return sst_matched
+
+
+
+
 def clean_water_mask(ds, target_res="r10m"):
     """
     Fix water mask by:
@@ -178,7 +263,8 @@ def build_stack(ds, bands, target_res="r10m", ref_band="b04", crs="EPSG:32632", 
         # elif b == "amei":
         #     arr = compute_amei(ds)
         elif b == "sst":
-            arr = load_era5_sst(ds, bbox=bbox, target_res=target_res, ref_band=ref_band, date=date, pat=pat)
+            #arr = load_era5_sst(ds, bbox=bbox, target_res=target_res, ref_band=ref_band, date=date, pat=pat)
+            arr = load_cmems_sst(ds, bbox=bbox, target_res=target_res, ref_band=ref_band, date=date)
             print(f"SST min/max loaded: {float(arr.min().values)}, {float(arr.max().values)}")
         else:
             raise ValueError(f"Band {b} not found or not supported.")

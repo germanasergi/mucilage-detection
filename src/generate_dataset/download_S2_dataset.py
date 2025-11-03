@@ -9,6 +9,8 @@ from loguru import logger
 from datetime import datetime
 from dotenv import load_dotenv
 from tqdm import tqdm
+import fsspec
+
 from eopf.common.constants import OpeningMode
 from eopf.common.file_utils import AnyPath
 from eopf.store.convert import convert
@@ -85,7 +87,7 @@ def prepare_paths(path_dir):
 
 
 
-def download_sentinel_data(df_output, base_dir, access_key, secret_key, endpoint_url):
+def download_sentinel2_data(df_output, base_dir, access_key, secret_key, endpoint_url):
     """Download Sentinel data from S3 to local directories"""
 
     input_dir = os.path.join(base_dir, "input")
@@ -134,6 +136,51 @@ def download_sentinel_data(df_output, base_dir, access_key, secret_key, endpoint
                     logger.warning(f"Could not clean temp SAFE {safe_dir}: {ce}")
 
 
+def download_sentinel3_data(df_output, base_dir, access_key, secret_key, endpoint_url):
+    """
+    Download Sentinel-3 SLSTR SST (.SEN3) data from CDSE S3 storage.
+    """
+    input_dir = os.path.join(base_dir, "sentinel3_input")
+    os.makedirs(input_dir, exist_ok=True)
+    logger.info(f"Created local directory: {input_dir}")
+
+    # fsspec S3 configuration for CDSE
+    s3_fs = fsspec.filesystem(
+        "s3",
+        key=access_key,
+        secret=secret_key,
+        client_kwargs={"endpoint_url": endpoint_url, "region_name": "default"}
+    )
+
+    for _, row in tqdm(df_output.iterrows(), total=len(df_output), desc="Downloading S3 SST data"):
+        try:
+            product_s3_path = row["S3Path"].lstrip("/")  # remove leading slash
+            product_name = os.path.basename(product_s3_path)
+            local_dir = os.path.join(input_dir, product_name)
+
+            # Skip if already downloaded
+            if os.path.exists(local_dir):
+                logger.info(f"Skipping (already exists): {local_dir}")
+                continue
+
+            logger.info(f"Downloading {product_s3_path} -> {local_dir}")
+
+            # Copy the entire .SEN3 directory recursively
+            s3_fs.get(f"s3://{product_s3_path}", local_dir, recursive=True)
+
+        except Exception as e:
+            logger.error(f"Error downloading {row.get('S3Path', 'unknown')} - {e}")
+
+        finally:
+            # Clean temporary data
+            tmp_dirs = glob.glob("/tmp/*.SEN3")
+            for d in tmp_dirs:
+                try:
+                    shutil.rmtree(d, ignore_errors=True)
+                except Exception as ce:
+                    logger.warning(f"Could not clean tmp dir {d}: {ce}")
+
+
         
 def main():
     # Load environment variables
@@ -159,7 +206,7 @@ def main():
     setup_logger(env['DATASET_DIR'], "sentinel_download_log")
 
     logger.info("Starting download process...")
-    download_sentinel_data(
+    download_sentinel3_data(
         df_output,
         env['DATASET_DIR'],
         env['ACCESS_KEY_ID'],

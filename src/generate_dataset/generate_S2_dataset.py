@@ -40,15 +40,15 @@ def main():
     # logger.info(f"Label: {label}")
 
     # Query Sentinel data
-    all_l1c_results, all_l2a_results = query_sentinel_data(
+    all_l2a_results = query_sentinel_data(
         bbox, start_date, end_date, max_items, max_cloud_cover
     )
 
     # Process and align data
-    df_l1c, df_l2a = queries_curation(all_l1c_results, all_l2a_results)
+    df_l2a = queries_curation(all_l2a_results)
 
-    # Retrieve tile names
-    df_l1c, df_l2a = retrieve_tile_name(df_l1c, df_l2a)
+    # # Retrieve tile names
+    # df_l1c, df_l2a = retrieve_tile_name(df_l1c, df_l2a)
 
     # # Retrieve labels
     # if label is not None:

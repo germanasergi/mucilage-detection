@@ -56,12 +56,6 @@ def setup_environment(config):
     DATASET_DIR = f"{BASE_DIR}/{DATASET_VERSION}"
     BANDS = config['bands']
 
-    # Create directories
-    input_dir = os.path.join(DATASET_DIR, "input")
-    output_dir = os.path.join(DATASET_DIR, "output")
-    os.makedirs(input_dir, exist_ok=True)
-    os.makedirs(output_dir, exist_ok=True)
-
     # Setup connector
     connector = S3Connector(
         endpoint_url=ENDPOINT_URL,
@@ -82,8 +76,6 @@ def setup_environment(config):
         'BASE_DIR': BASE_DIR,
         'DATASET_DIR': DATASET_DIR,
         'BANDS': BANDS,
-        'input_dir': input_dir,
-        'output_dir': output_dir,
         's3': s3,
         's3_client': s3_client,
         'bucket': bucket
@@ -123,11 +115,12 @@ def query_sentinel_data(bbox, start_date, end_date, max_items, max_cloud_cover, 
         try:
             # Query for L2A products
             l2a_query_url = create_cdse_query_url(
-                product_type="MSIL2A",
+                collection_name="SENTINEL-3", #SENTINEL-2
+                product_type="SL_2_WST__", #MSIL2A
                 polygon=polygon,
                 start_interval=start_interval,
                 end_interval=end_interval,
-                max_cloud_cover=max_cloud_cover,
+                #max_cloud_cover=max_cloud_cover,
                 max_items=max_items,
                 orderby="ContentDate/Start"
             )
@@ -138,35 +131,35 @@ def query_sentinel_data(bbox, start_date, end_date, max_items, max_cloud_cover, 
             for item in l2a_results:
                 item['query_interval'] = date_interval
 
-            # Query for L1C products
-            l1c_query_url = create_cdse_query_url(
-                product_type="MSIL1C",
-                polygon=polygon,
-                start_interval=start_interval,
-                end_interval=end_interval,
-                max_cloud_cover=max_cloud_cover,
-                max_items=max_items,
-                orderby="ContentDate/Start"
-            )
-            l1c_json = requests.get(l1c_query_url).json()
-            l1c_results = l1c_json.get('value', [])
+            # # Query for L1C products
+            # l1c_query_url = create_cdse_query_url(
+            #     product_type="MSIL1C",
+            #     polygon=polygon,
+            #     start_interval=start_interval,
+            #     end_interval=end_interval,
+            #     max_cloud_cover=max_cloud_cover,
+            #     max_items=max_items,
+            #     orderby="ContentDate/Start"
+            # )
+            # l1c_json = requests.get(l1c_query_url).json()
+            # l1c_results = l1c_json.get('value', [])
 
-            # Add interval metadata
-            for item in l1c_results:
-                item['query_interval'] = date_interval
+            # # Add interval metadata
+            # for item in l1c_results:
+            #     item['query_interval'] = date_interval
 
             # Log counts
-            l1c_count = len(l1c_results)
+            # l1c_count = len(l1c_results)
             l2a_count = len(l2a_results)
 
-            if l1c_count != l2a_count:
-                logger.warning(f"Mismatch in counts for {date_interval}: L1C={l1c_count}, L2A={l2a_count}")
+            # if l1c_count != l2a_count:
+            #     logger.warning(f"Mismatch in counts for {date_interval}: L1C={l1c_count}, L2A={l2a_count}")
 
-            # Append results
-            all_l1c_results.extend(l1c_results)
+            # # Append results
+            # all_l1c_results.extend(l1c_results)
             all_l2a_results.extend(l2a_results)
 
-            logger.info(f"L1C Items for {date_interval}: {l1c_count}")
+            # logger.info(f"L1C Items for {date_interval}: {l1c_count}")
             logger.info(f"L2A Items for {date_interval}: {l2a_count}")
             logger.info("####")
 
@@ -176,46 +169,46 @@ def query_sentinel_data(bbox, start_date, end_date, max_items, max_cloud_cover, 
         # Move to the next interval
         current_date = next_date
 
-    return all_l1c_results, all_l2a_results
+    return all_l2a_results
 
 
-def queries_curation(all_l1c_results, all_l2a_results):
+def queries_curation(all_l2a_results):
     """Process and align L1C and L2A data to ensure they match"""
     # Create DataFrames
-    df_l1c = pd.DataFrame(all_l1c_results)
+    # df_l1c = pd.DataFrame(all_l1c_results)
     df_l2a = pd.DataFrame(all_l2a_results)
 
     # Select required columns
     df_l2a = df_l2a[["Name", "S3Path", "Footprint", "GeoFootprint", "Attributes"]]
-    df_l1c = df_l1c[["Name", "S3Path", "Footprint", "GeoFootprint", "Attributes"]]
+    # df_l1c = df_l1c[["Name", "S3Path", "Footprint", "GeoFootprint", "Attributes"]]
 
     # Extract cloud cover
-    df_l1c['cloud_cover'] = df_l1c['Attributes'].apply(lambda x: x[2]["Value"])
+    # df_l1c['cloud_cover'] = df_l1c['Attributes'].apply(lambda x: x[2]["Value"])
     df_l2a['cloud_cover'] = df_l2a['Attributes'].apply(lambda x: x[2]["Value"])
     # Drop the Attributes column (note: inplace=True needed or need to reassign)
-    df_l1c = df_l1c.drop(columns=['Attributes'], axis=1)
+    # df_l1c = df_l1c.drop(columns=['Attributes'], axis=1)
     df_l2a = df_l2a.drop(columns=['Attributes'], axis=1)
     # Create id_key for matching
     df_l2a['id_key'] = df_l2a['Name'].apply(remove_last_segment_rsplit)
     df_l2a['id_key'] = df_l2a['id_key'].str.replace('MSIL2A_', 'MSIL1C_')
-    df_l1c['id_key'] = df_l1c['Name'].apply(remove_last_segment_rsplit)
+    # df_l1c['id_key'] = df_l1c['Name'].apply(remove_last_segment_rsplit)
 
     # Remove duplicates
     df_l2a = df_l2a.drop_duplicates(subset='id_key', keep='first')
-    df_l1c = df_l1c.drop_duplicates(subset='id_key', keep='first')
+    # df_l1c = df_l1c.drop_duplicates(subset='id_key', keep='first')
 
     # Align both datasets
-    df_l2a = df_l2a[df_l2a['id_key'].isin(df_l1c['id_key'])]
-    df_l1c = df_l1c[df_l1c['id_key'].isin(df_l2a['id_key'])]
+    # df_l2a = df_l2a[df_l2a['id_key'].isin(df_l1c['id_key'])]
+    # df_l1c = df_l1c[df_l1c['id_key'].isin(df_l2a['id_key'])]
 
     # Make sure the order is the same
     df_l2a = df_l2a.set_index('id_key')
-    df_l1c = df_l1c.set_index('id_key')
+    # df_l1c = df_l1c.set_index('id_key')
 
-    df_l2a = df_l2a.loc[df_l1c.index].reset_index()
-    df_l1c = df_l1c.reset_index()
+    # df_l2a = df_l2a.loc[df_l1c.index].reset_index()
+    # df_l1c = df_l1c.reset_index()
 
-    return df_l1c, df_l2a
+    return df_l2a
 
 
 def validate_data_alignment(df_l1c, df_l2a):

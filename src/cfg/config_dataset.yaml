@@ -4,7 +4,7 @@ endpoint_stac: 'https://stac.dataspace.copernicus.eu/v1/'
 bucket_name: 'eodata'
 
 # Dataset Configuration
-dataset_version: 'data/adr_inference'
+dataset_version: 'data/sentinel-3'
 base_dir: '/home/ubuntu/mucilage_pipeline/mucilage-detection'
 bands:
   - 'B02'
