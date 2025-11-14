@@ -18,7 +18,7 @@ import timm
 def latlon_to_pixel(zarr_file, lat, lon):
     # Find CRS of the dataset
     ds = xr.open_datatree(zarr_file, engine="zarr", mask_and_scale=False)
-    crs = "EPSG:32632"
+    crs = "EPSG:32635"
 
     # Transformer lat/lon → UTM
     transformer = pyproj.Transformer.from_crs("EPSG:4326", crs, always_xy=True)
@@ -47,7 +47,7 @@ def centered_patch_from_zarr(zarr_path, yc, xc, patch_size=256, bands=None):
         if b in ds['measurements/reflectance/r10m'] or \
            b in ds['measurements/reflectance/r20m'] or \
            b in ds['measurements/reflectance/r60m']:
-            arr = resample_band(ds, b, target_res="r10m", ref="b04", crs="EPSG:32632") / 10000.0
+            arr = resample_band(ds, b, target_res="r10m", ref="b04", crs="EPSG:32635") / 10000.0
             patch_bands.append(arr[y0:y1, x0:x1].values)
 
     patch = np.stack(patch_bands, axis=-1)
@@ -194,7 +194,7 @@ def run_inference(patch_file, model, device, mean, std, task = "classification",
         axes[3].set_title("AMEI")
 
         plt.tight_layout()
-        plt.savefig(os.path.join(save_dir, "segmentation_result_amei.png"), dpi=200)
+        plt.savefig(os.path.join(save_dir, "segmentation_result_marmara_cloud_amei.png"), dpi=200)
         plt.show()
 
     # # Save attention maps

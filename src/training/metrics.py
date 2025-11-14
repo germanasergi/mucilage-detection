@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import math
 import numpy as np
-from sklearn.metrics import auc, roc_auc_score, roc_curve, precision_recall_curve, f1_score, precision_score, recall_score
+from sklearn.metrics import auc, roc_auc_score, roc_curve, precision_recall_curve, f1_score, precision_score, recall_score, jaccard_score
 
 
 def plot_curve(df):
@@ -143,12 +143,6 @@ def plot_auc(results):
     fpr, tpr, roc_thresholds = roc_curve(y_true, y_score)
     auc_value = roc_auc_score(y_true, y_score)
 
-    precision, recall, thresholds = precision_recall_curve(y_true, y_score)
-    pr_auc = auc(recall, precision)
-    print(f"Precision: {precision_score(y_true, y_pred)}, Recall: {recall_score(y_true, y_pred)}")
-    print(f"F1 Score: {f1_score(y_true, y_pred)}")
-    print(f"Precision-Recall AUC: {pr_auc:.4f}")
-
     plt.figure()
     plt.plot(fpr, tpr, label=f"U-net (AUC={auc_value:.3f})")
     plt.plot([0,1], [0,1], linestyle="--", color="gray")
@@ -163,17 +157,31 @@ def plot_auc(results):
 
     print(f"ROC AUC: {auc_value:.3f}")
 
+def print_metrics(results):
+    y_true = results["y_true"].values
+    y_score = results["y_prob"].values
+    y_pred = results["y_pred"].values
+
+    precision, recall, _ = precision_recall_curve(y_true, y_score)
+    pr_auc = auc(recall, precision)
+
+    print(f"Precision: {precision_score(y_true, y_pred)}, Recall: {recall_score(y_true, y_pred)}")
+    print(f"F1 Score: {f1_score(y_true, y_pred)}")
+    print(f"IoU: {jaccard_score(y_true, y_pred)}")
+    print(f"Precision-Recall AUC: {pr_auc:.4f}")
+
 
 def main():
     dir_path = os.getcwd()
-    df = pd.read_csv(os.path.join(dir_path,"training_metrics_unet.csv"))
+    df = pd.read_csv(os.path.join(dir_path,"training_results/training_metrics_unet_noweights.csv"))
     test_numpy = np.load(os.path.join(dir_path,"saved_npy/test_cache.npz"), allow_pickle=True)['X']
-    results = pd.read_csv(os.path.join(dir_path,"test_predictions_unet.csv"))
+    results = pd.read_csv(os.path.join(dir_path,"training_results/test_predictions_unet_noweights.csv"))
 
-    # plot_curve(df)
+    #plot_curve(df)
     # plot_false_positives(test_numpy, results)
     # plot_segmentation_false_positives(test_patches=test_numpy, results=results)
-    plot_auc(results)
+    # plot_auc(results)
+    print_metrics(results)
 
 if __name__ == "__main__":
     main()

@@ -20,7 +20,7 @@ from dataset.dataset import Sentinel2PatchDataset, Sentinel2NumpyDataset
 from dataset.loader import define_loaders, define_model
 from model_zoo.models import CNN, MILResNet, MILResNetMultiHead, build_timm_model
 from torch.utils.data import DataLoader
-from training.optim import EarlyStopping, dice_loss_multiclass, combined_ce_dice_loss, FocalLoss
+from training.optim import EarlyStopping, dice_loss_multiclass, combined_ce_dice_loss, FocalLoss, FocalLoss2d
 from utils.plot import save_attention, save_multi_attention
 from generate_dataset.generate_ds import setup_environment
 #from training.metrics import MultiSpectralMetrics, avg_metric_bands
@@ -54,9 +54,9 @@ def filter_mucilage_patches(df, mask_file):
 
 
 def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2, res="r10m", bbox=None, date=None, pat=None):
-    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache_sst_cmems_augmented.npz", masks="roboflow_dataset/saved_masks/train_masks_sst_augmented.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
-    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache_sst_cmems.npz", masks="roboflow_dataset/saved_masks/val_masks_sst_cmems.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
-    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache_sst_cmems.npz", masks="roboflow_dataset/saved_masks/test_masks_sst_cmems.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
+    train_ds = Sentinel2NumpyDataset(df_train, bands, target_res=res, cache_file="saved_npy/train_cache_augmented.npz", masks="roboflow_dataset/saved_masks/train_masks_augmented.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
+    val_ds   = Sentinel2NumpyDataset(df_val, bands, target_res=res, cache_file="saved_npy/val_cache.npz", masks="roboflow_dataset/saved_masks/val_masks.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
+    test_ds  = Sentinel2NumpyDataset(df_test, bands, target_res=res, cache_file="saved_npy/test_cache.npz", masks="roboflow_dataset/saved_masks/test_masks.npz", task="segmentation", transform=False, bbox=bbox, date=date, pat=pat)
 
     # Normalize
     mean = np.nanmean(train_ds.X, axis=(0,1,2))
@@ -79,7 +79,7 @@ def build_model(config):
     model = define_model(
         name=config['MODEL']['model_name'],
         encoder_name=config['MODEL']['encoder_name'],
-        encoder_weights = config['MODEL']['encoder_weights'],
+        encoder_weights = None,
         in_channel=len(config['DATASET']['bands']),
         out_channels=config['MODEL']['num_classes'],
         activation=config['MODEL']['activation'])
@@ -119,16 +119,17 @@ def build_opt(model, config, y=None, device="cpu"):
     weights = 1.0 / class_counts
     weights = torch.tensor(weights, dtype=torch.float).to(device)
 
-    if config['MODEL']['num_classes'] == 1:
+    if config['MODEL']['num_classes'] == 2:
         logger.info("Using weighted BCEWithLogitsLoss")
-        criterion = FocalLoss(alpha=0.95, gamma=2) #nn.BCEWithLogitsLoss(pos_weight=weights[1])
+        criterion = FocalLoss2d(alpha=0.95, gamma=2) #nn.BCEWithLogitsLoss(pos_weight=weights[1])
+        print("Using Focal Loss for binary segmentation")
     else:
         logger.info(f"Using weighted CrossEntropyLoss with weights={weights}")
-        criterion = nn.CrossEntropyLoss(weight=weights)
-        # print("Using combined CE + Dice loss")
-        # criterion = lambda logits, masks: combined_ce_dice_loss(
-        # logits, masks, ce_weight=0.5, class_weights=weights
-        # )
+        #criterion = nn.CrossEntropyLoss(weight=weights)
+        print("Using combined CE + Dice loss")
+        criterion = lambda logits, masks: combined_ce_dice_loss(
+        logits, masks, ce_weight=0.5, class_weights=weights
+        )
 
     return optimizer, criterion, scheduler_class
 
@@ -287,6 +288,7 @@ def main():
 
     # --- Data ---
     df_train, df_val, df_test = split_data(args.patch_csv)
+
     #df_train_filtered = filter_mucilage_patches(df_train, mask_file="roboflow_dataset/saved_masks/train_masks_augmented.npz")
     train_loader, val_loader, test_loader, mean, std = prepare_data(df_train, df_val, df_test, bands, batch_size, res=res, bbox=bbox, date=mid_date, pat=pat)
     all_masks = []
@@ -325,7 +327,7 @@ def main():
 
         # Save metrics to CSV
         df_hist = pd.DataFrame(history)
-        #df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_unet.csv"), index=False)
+        df_hist.to_csv(os.path.join(SRC_DIR,"training_metrics_unet.csv"), index=False)
 
         del train_loss, train_acc, val_loss, val_acc
         torch.cuda.empty_cache()
@@ -333,13 +335,13 @@ def main():
 
     # Save model checkpoint
     checkpoint_path = os.path.join(SRC_DIR, "training/unet_sst_checkpoint.pth")
-    torch.save({
-        "model_state": model.state_dict(),
-        "mean": mean,
-        "std": std,
-        "config": config
-    }, checkpoint_path)
-    print(f"Checkpoint saved to {checkpoint_path}")
+    # torch.save({
+    #     "model_state": model.state_dict(),
+    #     "mean": mean,
+    #     "std": std,
+    #     "config": config
+    # }, checkpoint_path)
+    # print(f"Checkpoint saved to {checkpoint_path}")
 
     # Final test evaluation
     print("\n Running final test evaluation...")
@@ -352,7 +354,7 @@ def main():
     )
 
     print(f"Final Test Loss: {test_loss:.4f} | Test Pixel Accuracy: {test_acc:.4f}")
-    #results.to_csv(os.path.join(SRC_DIR, "test_predictions_unet.csv"), index=False)
+    results.to_csv(os.path.join(SRC_DIR, "test_predictions_unet.csv"), index=False)
 
 if __name__ == "__main__":
     main()

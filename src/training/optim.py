@@ -76,6 +76,39 @@ class FocalLoss(nn.Module):
             alpha_t = self.alpha * targets + (1-self.alpha)*(1-targets)
             loss = alpha_t * loss
         return loss.mean()
+    
+class FocalLoss2d(nn.Module):
+    def __init__(self, gamma=2.0, alpha=None, reduction='mean'):
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        # inputs: [B, C, H, W] (logits for each class)
+        # targets: [B, H, W] (class indices 0 or 1)
+        log_probs = F.log_softmax(inputs, dim=1)  # [B, 2, H, W]
+        probs = torch.exp(log_probs)
+
+        # Gather log_probs for the correct class
+        targets = targets.long()
+        log_p_t = log_probs.gather(1, targets.unsqueeze(1)).squeeze(1)
+        p_t = probs.gather(1, targets.unsqueeze(1)).squeeze(1)
+
+        # Focal modulation
+        mod = (1 - p_t) ** self.gamma
+        loss = -mod * log_p_t
+
+        if self.alpha is not None:
+            alpha_t = self.alpha * (targets == 1).float() + (1 - self.alpha) * (targets == 0).float()
+            loss = alpha_t * loss
+
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        else:
+            return loss
 
 
 class EarlyStopping:

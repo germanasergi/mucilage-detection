@@ -206,7 +206,7 @@ def main():
     setup_logger(env['DATASET_DIR'], "sentinel_download_log")
 
     logger.info("Starting download process...")
-    download_sentinel3_data(
+    download_sentinel2_data(
         df_output,
         env['DATASET_DIR'],
         env['ACCESS_KEY_ID'],

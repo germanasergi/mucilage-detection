@@ -4,7 +4,7 @@ endpoint_stac: 'https://stac.dataspace.copernicus.eu/v1/'
 bucket_name: 'eodata'
 
 # Dataset Configuration
-dataset_version: 'data/sentinel-3'
+dataset_version: 'data/marmara'
 base_dir: '/home/ubuntu/mucilage_pipeline/mucilage-detection'
 bands:
   - 'B02'
@@ -16,13 +16,13 @@ bands:
 # Query Configuration
 query:
   bbox:
-    - 13.01
-    - 43.93
-    - 13.09
-    - 43.87
+    - 29.25
+    - 40.75
+    - 29.36
+    - 40.7
 
-  start_date: '2025-08-06'
-  end_date: '2025-08-08'
+  start_date: '2021-05-10'
+  end_date: '2021-05-20'
   max_items: 1000
   max_cloud_cover: 30
 

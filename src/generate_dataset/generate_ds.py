@@ -115,12 +115,12 @@ def query_sentinel_data(bbox, start_date, end_date, max_items, max_cloud_cover, 
         try:
             # Query for L2A products
             l2a_query_url = create_cdse_query_url(
-                collection_name="SENTINEL-3", #SENTINEL-2
-                product_type="SL_2_WST__", #MSIL2A
+                collection_name="SENTINEL-2", #SENTINEL-3
+                product_type="MSIL2A", #SL_2_WST__
                 polygon=polygon,
                 start_interval=start_interval,
                 end_interval=end_interval,
-                #max_cloud_cover=max_cloud_cover,
+                max_cloud_cover=max_cloud_cover,
                 max_items=max_items,
                 orderby="ContentDate/Start"
             )
