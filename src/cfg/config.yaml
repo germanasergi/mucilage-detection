@@ -30,4 +30,4 @@ TRAINING:
   scheduler_type: "ReduceLROnPlateau"
   factor: 0.5
   patience: 5
-  num_epochs: 20
+  num_epochs: 50

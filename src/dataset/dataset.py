@@ -72,7 +72,7 @@ class Sentinel2PatchDataset(Dataset):
 
 
 class Sentinel2NumpyDataset(Dataset):
-    def __init__(self, df, bands, patch_size=256, target_res="r10m", transform=False, cache_file=None, masks = None, task = "classification", bbox=None, date=None, pat=None):
+    def __init__(self, df, bands, patch_size=256, target_res="r10m", transform=False, cache_file=None, masks = None, indices = None, task = "classification", bbox=None, date=None, pat=None):
         """
         Args:
             df (pd.DataFrame): containing [zarr_path, x, y, label].
@@ -88,6 +88,7 @@ class Sentinel2NumpyDataset(Dataset):
         self.transform = transform
         self.cache_file = cache_file
         self.masks = masks
+        self.indices = indices
         self.task = task
         self.bbox = bbox
         self.date = date
@@ -111,6 +112,9 @@ class Sentinel2NumpyDataset(Dataset):
                 self.y = masks["masks"]
             elif self.task == "classification":
                 self.y = cache["y"]
+            if indices is not None: # ADDED FOR K-FOLD (INDICES OF EACH FOLD)
+                self.X = self.X[indices]
+                self.y = self.y[indices]
         else:
             # Build dataset from zarr files
             if self.task == "classification":

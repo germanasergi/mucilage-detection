@@ -50,6 +50,7 @@ def define_loaders(
 
 
 
+    
 def define_model(
     name,
     encoder_name,
@@ -57,38 +58,59 @@ def define_model(
     in_channel=3,
     encoder_weights=None,
     activation=None,
+    dropout=False
 ):
-    # Get the model class dynamically based on name
-    try:
-        # Get the model class from segmentation_models_pytorch
-        ModelClass = getattr(smp, name)
-
-        # Create the model
-        model = ModelClass(
+    # Use the subclass if it's a Unet
+    if dropout==True and name.lower() == "unet":
+        model = UNetDropout(
             encoder_name=encoder_name,
             encoder_weights=encoder_weights,
             in_channels=in_channel,
             classes=out_channels,
             decoder_attention_type="scse",
             activation=None,
+            dropout=0.2
         )
-
-        # Add ReLU activation after the model
-        if activation == "relu":
-            model = nn.Sequential(
-                model,
-                nn.ReLU()
-            )
-        if activation == "sigmoid":
-            model = nn.Sequential(
-                model,
-                nn.Sigmoid()
-            )
-
-
-
         return model
+    else:
+        try:
+            # Get the model class from segmentation_models_pytorch
+            ModelClass = getattr(smp, name)
+
+            # Create the model
+            model = ModelClass(
+                encoder_name=encoder_name,
+                encoder_weights=encoder_weights,
+                in_channels=in_channel,
+                classes=out_channels,
+                decoder_attention_type="scse",
+                activation=None
+            )
+
+            # Add ReLU activation after the model
+            if activation == "relu":
+                model = nn.Sequential(model, nn.ReLU())
+            elif activation == "sigmoid":
+                model = nn.Sequential(model, nn.Sigmoid())
+
+            return model
+        
+        except AttributeError:
+            # If the model name is not found in the library
+            raise ValueError(f"Model '{name}' not found in segmentation_models_pytorch. Available models: {dir(smp)}")
+        
+
+class UNetDropout(smp.Unet):
+    def __init__(self, *args, dropout=0.2, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mc_dropout = nn.Dropout2d(dropout)  # spatial dropout
+
+    def forward(self, x):
+        x = super().forward(x)
+        return self.mc_dropout(x) 
     
-    except AttributeError:
-        # If the model name is not found in the library
-        raise ValueError(f"Model '{name}' not found in segmentation_models_pytorch. Available models: {dir(smp)}")
+def add_decoder_dropout(model, p=0.5):
+    for module in model.decoder.modules():
+        if isinstance(module, smp.base.modules.Conv2dReLU):
+            # Append dropout after the ReLU
+            module.add_module("dropout", nn.Dropout2d(p))

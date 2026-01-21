@@ -109,6 +109,8 @@ class FocalLoss2d(nn.Module):
             return loss.sum()
         else:
             return loss
+        
+
 
 
 class EarlyStopping:

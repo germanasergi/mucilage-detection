@@ -36,6 +36,7 @@ def setup_environment(config):
     # Keep these from environment variables
     ACCESS_KEY_ID = os.environ.get("ACCESS_KEY_ID")
     SECRET_ACCESS_KEY = os.environ.get("SECRET_ACCESS_KEY")
+    PAT = os.environ.get("PAT")
 
     # Get other parameters from config
     ENDPOINT_URL = config['endpoint_url']
@@ -62,6 +63,7 @@ def setup_environment(config):
         'BUCKET_NAME': BUCKET_NAME,
         'DATASET_DIR': DATASET_DIR,
         'BANDS': BANDS,
+        'PAT': PAT,
         's3_client': connector.get_s3_client(),
         's3': connector.get_s3_resource()
     }

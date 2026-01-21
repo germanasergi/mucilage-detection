@@ -173,9 +173,9 @@ def print_metrics(results):
 
 def main():
     dir_path = os.getcwd()
-    df = pd.read_csv(os.path.join(dir_path,"training_results/training_metrics_unet_noweights.csv"))
+    df = pd.read_csv(os.path.join(dir_path,"training_results/training_metrics_unet.csv"))
     test_numpy = np.load(os.path.join(dir_path,"saved_npy/test_cache.npz"), allow_pickle=True)['X']
-    results = pd.read_csv(os.path.join(dir_path,"training_results/test_predictions_unet_noweights.csv"))
+    results = pd.read_csv(os.path.join(dir_path,"training_results/test_predictions_unet.csv"))
 
     #plot_curve(df)
     # plot_false_positives(test_numpy, results)

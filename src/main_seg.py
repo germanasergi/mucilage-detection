@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 
 from utils.utils import load_config
 from dataset.dataset import Sentinel2PatchDataset, Sentinel2NumpyDataset
-from dataset.loader import define_loaders, define_model
+from dataset.loader import define_loaders, define_model, add_decoder_dropout
 from model_zoo.models import CNN, MILResNet, MILResNetMultiHead, build_timm_model
 from torch.utils.data import DataLoader
 from training.optim import EarlyStopping, dice_loss_multiclass, combined_ce_dice_loss, FocalLoss, FocalLoss2d
@@ -75,14 +75,16 @@ def prepare_data(df_train, df_val, df_test, bands, batch_size=64, num_workers=2,
 
 def build_model(config):
 
-
     model = define_model(
         name=config['MODEL']['model_name'],
         encoder_name=config['MODEL']['encoder_name'],
         encoder_weights = None,
         in_channel=len(config['DATASET']['bands']),
         out_channels=config['MODEL']['num_classes'],
-        activation=config['MODEL']['activation'])
+        activation=config['MODEL']['activation'],
+        dropout=False
+        )
+    add_decoder_dropout(model, p=0.3)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
@@ -143,6 +145,8 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device):
 
         optimizer.zero_grad()
         outputs = model(inputs)
+        if isinstance(outputs, tuple):
+            outputs = outputs[0]
         loss = criterion(outputs, masks)
         loss.backward()
         optimizer.step()
@@ -153,7 +157,7 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device):
                 preds = (torch.sigmoid(outputs) > 0.8).float()
                 acc = (preds == masks).float().mean().item()
             else:  # Multi-class segmentation
-                preds = torch.argmax(outputs, dim=1)
+                preds = (torch.softmax(outputs, dim=1)[:,1] > 0.5).float()
                 if masks.ndim == 4:  # (B,1,H,W)
                     masks = masks.squeeze(1)
                 acc = (preds == masks).float().mean().item()
@@ -180,17 +184,20 @@ def evaluate_model(model, val_loader, criterion, device):
         for inputs, masks in tqdm(val_loader, desc="Validation", leave=False):
             inputs, masks = inputs.to(device), masks.to(device)
             outputs = model(inputs)
+            if isinstance(outputs, tuple):
+                outputs = outputs[0]
             loss = criterion(outputs, masks)
 
-            # ---- Pixel accuracy ----
-            if outputs.shape[1] == 1:  # Binary
-                preds = (torch.sigmoid(outputs) > 0.8).float()
-                acc = (preds == masks).float().mean().item()
-            else:  # Multi-class
-                preds = torch.argmax(outputs, dim=1)
-                if masks.ndim == 4:
-                    masks = masks.squeeze(1)
-                acc = (preds == masks).float().mean().item()
+                # ---- Pixel accuracy ----
+            with torch.no_grad():
+                if outputs.shape[1] == 1:  # Binary segmentation
+                    preds = (torch.sigmoid(outputs) > 0.8).float()
+                    acc = (preds == masks).float().mean().item()
+                else:  # Multi-class segmentation
+                    preds = (torch.softmax(outputs, dim=1)[:,1] > 0.5).float()
+                    if masks.ndim == 4:  # (B,1,H,W)
+                        masks = masks.squeeze(1)
+                    acc = (preds == masks).float().mean().item()
 
             running_loss += loss.item() * inputs.size(0)
             running_acc += acc * inputs.size(0)
@@ -214,6 +221,8 @@ def test_model(model, test_loader, criterion, device, save_preds_dir=None):
         for i, (inputs, masks) in enumerate(tqdm(test_loader, desc="Testing", leave=False)):
             inputs, masks = inputs.to(device), masks.to(device)
             outputs = model(inputs)
+            if isinstance(outputs, tuple):
+                outputs = outputs[0]
             loss = criterion(outputs, masks)
 
             # Handle binary vs multi-class
@@ -334,14 +343,14 @@ def main():
         gc.collect()
 
     # Save model checkpoint
-    checkpoint_path = os.path.join(SRC_DIR, "training/unet_sst_checkpoint.pth")
-    # torch.save({
-    #     "model_state": model.state_dict(),
-    #     "mean": mean,
-    #     "std": std,
-    #     "config": config
-    # }, checkpoint_path)
-    # print(f"Checkpoint saved to {checkpoint_path}")
+    checkpoint_path = os.path.join(SRC_DIR, "training/unet_checkpoint_dropout.pth")
+    torch.save({
+        "model_state": model.state_dict(),
+        "mean": mean,
+        "std": std,
+        "config": config
+    }, checkpoint_path)
+    print(f"Checkpoint saved to {checkpoint_path}")
 
     # Final test evaluation
     print("\n Running final test evaluation...")
